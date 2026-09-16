@@ -17,7 +17,7 @@ import {
 import { LeafletMapPicker, type LeafletMapPickerHandle } from '@/src/components/LeafletMapPicker';
 import { AppButton } from '@/src/components/AppButton';
 import { AppInput } from '@/src/components/AppInput';
-import { api } from '@/src/lib/api';
+import { api, getServiceArea, type ServiceArea } from '@/src/lib/api';
 import { useAuth } from '@/src/context/AuthContext';
 import type { FareEstimate, BookTripRequest } from '@/src/types/api';
 import { colors } from '@/src/theme/colors';
@@ -64,12 +64,18 @@ export default function NewBookingScreen() {
   // it resolves — otherwise a fast tap on "Estimate fare" right after
   // typing could fire before the coordinates it depends on are ready.
   const [geocodingTarget, setGeocodingTarget] = useState<MapTarget | null>(null);
+  const [serviceArea, setServiceArea] = useState<ServiceArea | undefined>();
 
   const activePoint = target === 'pickup' ? pickup : dropoff;
   const hasAddresses = Boolean(pickup.address.trim() && dropoff.address.trim());
 
   useEffect(() => {
     loadCurrentLocation();
+    let mounted = true;
+    const refreshServiceArea = () => getServiceArea().then(area => { if (mounted) setServiceArea(area); }).catch(() => undefined);
+    refreshServiceArea();
+    const timer = setInterval(refreshServiceArea, 15000);
+    return () => { mounted = false; clearInterval(timer); };
   }, []);
 
   async function reverseGeocode(latitude: number, longitude: number) {
@@ -278,6 +284,7 @@ export default function NewBookingScreen() {
           onTouchCancel={() => setScrollEnabled(true)}
         >
           <LeafletMapPicker
+            key={serviceArea ? `${serviceArea.latitude}-${serviceArea.longitude}-${serviceArea.radiusKm}` : 'default-service-area'}
             ref={mapRef}
             initialCenter={center}
             initialZoom={15}
@@ -285,6 +292,7 @@ export default function NewBookingScreen() {
             dropoff={dropoff}
             onMapPress={(point) => selectPoint(point.latitude, point.longitude)}
             onReady={() => setMapReady(true)}
+            serviceArea={serviceArea}
           />
           <View style={styles.mapOverlay} pointerEvents="none">
             <Text style={styles.mapHint}>Tap anywhere to place the {target === 'pickup' ? 'pickup' : 'destination'} pin.</Text>

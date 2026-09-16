@@ -1,13 +1,16 @@
 // File path in project: ridehailing-client/src/components/admin/AdminDashboard.jsx
-import React, { useState, useEffect } from 'react';
-import { Shield, Settings, CreditCard, LogOut, Car, Users, UserCog } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Shield, Settings, CreditCard, LogOut, Car, Users, UserCog, LayoutDashboard, BarChart3 } from 'lucide-react';
 import LiveTrips from './LiveTrips';
 import AuditLogs from './AuditLogs';
 import DriversPanel from './DriversPanel';
+import UsersPanel from './UsersPanel';
+import OverviewPanel from './OverviewPanel';
+import LeafletMap from './LeafletMap';
 import { apiFetch } from '../../lib/api';
 
 export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
-  const [activeTab, setActiveTab] = useState('general');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState({});
   const [saveError, setSaveError] = useState('');
@@ -26,6 +29,9 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
           const data = await response.json();
           const mappedSettings = {};
           data.forEach(item => { mappedSettings[item.key] = item.value; });
+          mappedSettings['service_area.latitude'] ??= '8.152';
+          mappedSettings['service_area.longitude'] ??= '123.258';
+          mappedSettings['service_area.radius_km'] ??= '5';
           setSettings(mappedSettings);
         }
       } catch (error) {
@@ -59,6 +65,11 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
+  const serviceArea = {
+    lat: Number(settings['service_area.latitude'] || 8.152),
+    lng: Number(settings['service_area.longitude'] || 123.258),
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-950 flex text-slate-100 font-sans z-10">
       {/* Sidebar Navigation */}
@@ -73,6 +84,18 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
           </div>
 
           <nav className="space-y-1">
+            <button type="button" onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition ${activeTab === 'dashboard' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/10' : 'text-slate-400 hover:bg-slate-800'}`}>
+              <LayoutDashboard className="w-4 h-4" /> Dashboard
+            </button>
+            <button type="button" onClick={() => setActiveTab('users')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition ${activeTab === 'users' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/10' : 'text-slate-400 hover:bg-slate-800'}`}>
+              <Users className="w-4 h-4" /> Users
+            </button>
+            <button type="button" onClick={() => setActiveTab('trips')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition ${activeTab === 'trips' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/10' : 'text-slate-400 hover:bg-slate-800'}`}>
+              <Car className="w-4 h-4" /> Rides
+            </button>
+            <button type="button" onClick={() => setActiveTab('analytics')} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition ${activeTab === 'analytics' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/10' : 'text-slate-400 hover:bg-slate-800'}`}>
+              <BarChart3 className="w-4 h-4" /> Analytics
+            </button>
             <button
               type="button"
               onClick={() => setActiveTab('general')}
@@ -80,7 +103,7 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
                 activeTab === 'general' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/10' : 'text-slate-400 hover:bg-slate-800'
               }`}
             >
-              <Settings className="w-4 h-4" /> System Control Variables
+              <Settings className="w-4 h-4" /> Settings
             </button>
             <button
               type="button"
@@ -132,6 +155,17 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
 
       {/* Main Workspace Panel Container */}
       <div className="flex-1 overflow-y-auto p-8">
+        {activeTab === 'dashboard' && <OverviewPanel onAuthError={onAuthError} />}
+        {activeTab === 'users' && <UsersPanel onAuthError={onAuthError} />}
+        {activeTab === 'trips' && <LiveTrips onAuthError={onAuthError} />}
+        {activeTab === 'analytics' && <OverviewPanel onAuthError={onAuthError} />}
+        {activeTab === 'drivers' && <DriversPanel onAuthError={onAuthError} />}
+        {activeTab === 'audit' && <AuditLogs onAuthError={onAuthError} />}
+        {(activeTab === 'general' || activeTab === 'fares') && <div className="mb-6 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden"><div className="p-4 border-b border-slate-800"><h2 className="font-bold">Service Area</h2><p className="text-xs text-slate-500 mt-1">Only admins can move this circle. Press Commit Parameters Change to publish it to customer and driver maps.</p></div><LeafletMap center={serviceArea} radiusKm={Number(settings['service_area.radius_km'] || 5)} onMove={(point) => { handleSettingChange('service_area.latitude', point.lat.toFixed(6)); handleSettingChange('service_area.longitude', point.lng.toFixed(6)); }} /></div>}
+        {(activeTab !== 'general' && activeTab !== 'fares' && activeTab !== 'dashboard' && activeTab !== 'users' && activeTab !== 'trips' && activeTab !== 'analytics' && activeTab !== 'drivers' && activeTab !== 'audit') && <p className="text-slate-400">Select an admin section.</p>}
+        {activeTab !== 'general' && activeTab !== 'fares' && activeTab !== 'dashboard' && activeTab !== 'users' && activeTab !== 'trips' && activeTab !== 'analytics' && activeTab !== 'drivers' && activeTab !== 'audit' ? null : null}
+        {activeTab !== 'general' && activeTab !== 'fares' ? null : (
+        <>
         {(activeTab === 'general' || activeTab === 'fares') && loading ? (
           <div className="text-amber-500 font-semibold text-sm">Syncing parameters data table...</div>
         ) : (
@@ -228,10 +262,9 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
               </form>
             )}
 
-            {activeTab === 'trips' && <LiveTrips onAuthError={onAuthError} />}
-            {activeTab === 'drivers' && <DriversPanel onAuthError={onAuthError} />}
-            {activeTab === 'audit' && <AuditLogs onAuthError={onAuthError} />}
           </>
+        )}
+        </>
         )}
       </div>
     </div>

@@ -1,21 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { RefreshCw, UserCheck } from 'lucide-react';
+import { apiFetch } from '../../lib/api';
 
-export default function AuditLogs() {
+export default function AuditLogs({ onAuthError }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
   async function fetchAuditLogs() {
     try {
       setLoading(true);
-      // Hits your backend settings controller parameters
-      const response = await fetch('http://localhost:5000/api/settings');
+      const response = await apiFetch('/api/settings/audit?limit=100');
       if (response.ok) {
-        // Since we are checking configuration actions, we filter parameter states
         const data = await response.json();
         setLogs(data || []);
       }
     } catch (error) {
+      if (error.isAuthError) { onAuthError?.(); return; }
       console.error("Failed to load administration audit logs:", error);
     } finally {
       setLoading(false);
@@ -57,18 +57,18 @@ export default function AuditLogs() {
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline mb-1">
                     <span className="font-mono text-xs text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800 font-bold">
-                      {log.key}
+                      {log.action}
                     </span>
                     <span className="text-xs text-slate-500">
-                      {new Date(log.updatedAt).toLocaleString()}
+                      {new Date(log.createdAt).toLocaleString()}
                     </span>
                   </div>
-                  <p className="text-slate-200 text-sm font-medium">{log.label}</p>
-                  <p className="text-slate-400 text-xs mt-1">{log.description || 'No system parameter description provided.'}</p>
+                  <p className="text-slate-200 text-sm font-medium">{log.entityType} {log.entityId ? `· ${log.entityId}` : ''}</p>
+                  <p className="text-slate-400 text-xs mt-1">By {log.adminName || 'admin'}</p>
                   <div className="mt-2 text-xs flex items-center gap-2">
                     <span className="text-slate-500">Live Engine Value:</span>
                     <span className="font-mono bg-slate-950 text-emerald-400 font-semibold px-2 py-0.5 rounded border border-slate-800/60">
-                      {log.value}
+                      {log.newValue ? JSON.stringify(log.newValue) : '{}'}
                     </span>
                   </div>
                 </div>

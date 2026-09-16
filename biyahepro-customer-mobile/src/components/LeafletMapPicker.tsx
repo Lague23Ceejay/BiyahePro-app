@@ -44,11 +44,13 @@ type Props = {
   onMapPress: (point: LatLng) => void;
   /** Called once, when the Leaflet page has finished loading and is interactive. */
   onReady?: () => void;
+  serviceArea?: { latitude: number; longitude: number; radiusKm: number };
 };
 
 // Self-contained HTML string — no bundling step needed, the WebView loads
 // this directly. Leaflet's JS/CSS come from unpkg's CDN.
-function buildHtml({ latitude, longitude }: LatLng, zoom: number) {
+function buildHtml({ latitude, longitude }: LatLng, zoom: number, serviceArea?: Props['serviceArea']) {
+  const circle = serviceArea ? `L.circle([${serviceArea.latitude}, ${serviceArea.longitude}], { radius: ${serviceArea.radiusKm * 1000}, color: '#FF6412', fillColor: '#FF6412', fillOpacity: 0.08 }).addTo(map);` : '';
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -81,6 +83,7 @@ function buildHtml({ latitude, longitude }: LatLng, zoom: number) {
 
     var pickupMarker = L.marker([${latitude}, ${longitude}], { icon: pickupIcon }).addTo(map);
     var dropoffMarker = L.marker([${latitude}, ${longitude}], { icon: dropoffIcon }).addTo(map);
+    ${circle}
 
     function post(message) {
       if (window.ReactNativeWebView) {
@@ -116,12 +119,12 @@ function buildHtml({ latitude, longitude }: LatLng, zoom: number) {
 }
 
 export const LeafletMapPicker = forwardRef<LeafletMapPickerHandle, Props>(
-  function LeafletMapPicker({ initialCenter, initialZoom = 15, pickup, dropoff, onMapPress, onReady }, ref) {
+  function LeafletMapPicker({ initialCenter, initialZoom = 15, pickup, dropoff, onMapPress, onReady, serviceArea }, ref) {
     const webviewRef = useRef<WebView>(null);
     // The HTML is only built once per mount — after that, marker/center
     // updates go through postMessage rather than reloading the page (a
     // reload would flash the tiles and reset zoom/pan on every keystroke).
-    const htmlRef = useRef(buildHtml(initialCenter, initialZoom));
+    const htmlRef = useRef(buildHtml(initialCenter, initialZoom, serviceArea));
     const readyRef = useRef(false);
 
     useImperativeHandle(ref, () => ({

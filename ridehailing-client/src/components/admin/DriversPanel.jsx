@@ -104,7 +104,7 @@ export default function DriversPanel({ onAuthError }) {
 
   return (
     <div className="max-w-5xl">
-      <header className="mb-8 flex items-start justify-between">
+      <header className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Fleet & Driver Performance</h1>
           <p className="text-slate-400 text-sm mt-1">

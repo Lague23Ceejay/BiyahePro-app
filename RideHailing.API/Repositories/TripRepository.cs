@@ -143,8 +143,12 @@ public class TripRepository(IConfiguration config) : ITripRepository
     {
         using var db = Connection();
         var offset = (page - 1) * pageSize;
-        var column = role == "driver" ? "driver_id" : "customer_id";
-        var total = await db.QuerySingleAsync<int>($"SELECT COUNT(*) FROM trips WHERE {column} = @UserId", new { UserId = userId });
+        var ownership = role == "driver" ? "d.user_id = @UserId" : "t.customer_id = @UserId";
+        var total = await db.QuerySingleAsync<int>($@"
+            SELECT COUNT(*)
+            FROM trips t
+            LEFT JOIN drivers d ON d.id = t.driver_id
+            WHERE {ownership}", new { UserId = userId });
         var sql = $@"
             SELECT {TripColumns}, {LatLngSelectExpr},
                 uc.full_name AS customer_name,
@@ -153,7 +157,7 @@ public class TripRepository(IConfiguration config) : ITripRepository
             LEFT JOIN users uc ON uc.id = t.customer_id
             LEFT JOIN drivers d ON d.id = t.driver_id
             LEFT JOIN users ud ON ud.id = d.user_id
-            WHERE t.{column} = @UserId
+            WHERE {ownership}
             ORDER BY t.requested_at DESC
             LIMIT @PageSize OFFSET @Offset";
         var items = await db.QueryAsync<Trip>(sql, new { UserId = userId, PageSize = pageSize, Offset = offset });

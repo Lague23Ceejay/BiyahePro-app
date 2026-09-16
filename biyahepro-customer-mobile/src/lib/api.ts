@@ -18,6 +18,16 @@ const fallbackBaseUrl = Platform.select({
 });
 
 export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || fallbackBaseUrl || '').replace(/\/$/, '');
+export type ServiceArea = { latitude: number; longitude: number; radiusKm: number };
+export async function getServiceArea(): Promise<ServiceArea> {
+  const response = await fetch(`${API_BASE_URL}/api/settings/public`);
+  if (!response.ok) throw new Error('Unable to load service area.');
+  const settings = await response.json() as Array<{ key: string; value: string }>;
+  const values = Object.fromEntries(settings.map(setting => [setting.key, Number(setting.value)]));
+  const latitude = values['service_area.latitude']; const longitude = values['service_area.longitude']; const radiusKm = values['service_area.radius_km'];
+  if (![latitude, longitude, radiusKm].every(Number.isFinite)) throw new Error('Service area is not configured.');
+  return { latitude, longitude, radiusKm };
+}
 
 let refreshPromise: Promise<string | null> | null = null;
 

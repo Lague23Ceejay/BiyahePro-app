@@ -3,7 +3,7 @@
 # bind-mounted in docker-compose.yml (not baked in), so this image only
 # needs node_modules installed — live edits on the host are picked up the
 # same way they would running `npx expo start` natively.
-FROM node:20-bullseye
+FROM node:20-bookworm
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y \

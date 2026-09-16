@@ -36,6 +36,10 @@ public class SettingsController(ISettingsRepository settingsRepo, ISettingsServi
         return Ok(all);
     }
 
+    [HttpGet("audit")]
+    public async Task<IActionResult> GetAudit([FromQuery] int limit = 100)
+        => Ok(await settingsRepo.GetAuditLogsAsync(limit));
+
     // Update an individual configuration value and write to admin audit log
     [HttpPatch("{key}")]
     public async Task<IActionResult> Update(string key, [FromBody] UpdateSettingRequest req)

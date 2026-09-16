@@ -28,6 +28,9 @@ INSERT INTO app_settings (key, value, data_type, category, label, description, i
 ('ops.location_ping_seconds',   '5',  'number', 'operations', 'Location ping interval',   'How often driver app sends location update (seconds)',  false),
 ('ops.max_active_trips_driver', '1',  'number', 'operations', 'Max concurrent trips',     'Active trips allowed per driver at once',               false),
 ('ops.scheduled_min_lead_minutes', '30', 'number', 'operations', 'Scheduled ride lead time', 'Earliest a scheduled ride can be booked ahead of its requested time', false),
+('service_area.latitude', '8.152', 'number', 'operations', 'Service area latitude', 'Center latitude used by customer and driver maps', true),
+('service_area.longitude', '123.258', 'number', 'operations', 'Service area longitude', 'Center longitude used by customer and driver maps', true),
+('service_area.radius_km', '5', 'number', 'operations', 'Service area radius', 'Radius of the admin-controlled service area in kilometers', true),
 
 -- ── Feature flags ────────────────────────────────────────────
 ('feature.cash_payment',        'true',  'boolean', 'features', 'Cash payments',          'Allow cash as payment method',                          true),
