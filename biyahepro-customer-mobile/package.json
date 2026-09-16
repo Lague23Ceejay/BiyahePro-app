@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@microsoft/signalr": "^8.0.7",
     "@react-native-community/datetimepicker": "9.1.0",
     "expo": "~57.0.9",
     "expo-location": "~57.0.15",
@@ -24,7 +25,7 @@
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "4.26.0",
     "react-native-web": "~0.21.0",
-    "@microsoft/signalr": "^8.0.7"
+    "react-native-webview": "^14.0.1"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",

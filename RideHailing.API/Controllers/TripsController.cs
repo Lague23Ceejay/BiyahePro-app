@@ -75,7 +75,6 @@ public class TripsController(ITripService tripService, IFareService fareService)
 
     // GET: api/trips/history (Fetches paginated historic logs for customers/drivers)
     [HttpGet("history")]
-    [AllowAnonymous]
     public async Task<IActionResult> History(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)

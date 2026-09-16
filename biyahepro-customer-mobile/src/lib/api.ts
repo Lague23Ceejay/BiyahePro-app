@@ -9,6 +9,7 @@ import type {
   RegisterPayload,
   Trip,
 } from '@/src/types/api';
+import { loadSession, saveSession } from '@/src/lib/session';
 
 const fallbackBaseUrl = Platform.select({
   android: 'http://10.0.2.2:5000',
@@ -17,6 +18,8 @@ const fallbackBaseUrl = Platform.select({
 });
 
 export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || fallbackBaseUrl || '').replace(/\/$/, '');
+
+let refreshPromise: Promise<string | null> | null = null;
 
 async function readError(response: Response) {
   try {
@@ -28,7 +31,19 @@ async function readError(response: Response) {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}, token?: string) {
+async function refreshAccessToken() {
+  const session = await loadSession();
+  if (!session?.refreshToken) return null;
+
+  const refreshed = await request<AuthResponse>('/api/auth/refresh', {
+    method: 'POST',
+    body: JSON.stringify(session.refreshToken),
+  }, undefined, false);
+  await saveSession(refreshed);
+  return refreshed.accessToken;
+}
+
+async function request<T>(path: string, init: RequestInit = {}, token?: string, retryOnUnauthorized = true) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
@@ -37,6 +52,16 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string) 
       ...(init.headers || {}),
     },
   });
+
+  if (response.status === 401 && token && retryOnUnauthorized) {
+    refreshPromise ??= refreshAccessToken().finally(() => { refreshPromise = null; });
+    try {
+      const refreshedToken = await refreshPromise;
+      if (refreshedToken) return request<T>(path, init, refreshedToken, false);
+    } catch {
+      // Keep the original unauthorized error when the refresh token is invalid.
+    }
+  }
 
   if (!response.ok) throw new Error(await readError(response));
   if (response.status === 204) return undefined as T;

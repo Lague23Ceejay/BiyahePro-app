@@ -1,7 +1,7 @@
 // File path in project: biyahepro-customer-mobile/app/booking/new.tsx
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as Location from 'expo-location';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
 import {
   ActivityIndicator,
@@ -14,7 +14,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import MapView, { Marker, Region } from 'react-native-maps';
+import { LeafletMapPicker, type LeafletMapPickerHandle } from '@/src/components/LeafletMapPicker';
 import { AppButton } from '@/src/components/AppButton';
 import { AppInput } from '@/src/components/AppInput';
 import { api } from '@/src/lib/api';
@@ -38,14 +38,16 @@ function formatAddress(address?: Location.LocationGeocodedAddress) {
 
 export default function NewBookingScreen() {
   const { session } = useAuth();
+  const mapRef = useRef<LeafletMapPickerHandle>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  // Toggled off for the duration of a touch that starts inside the map
+  // card, so the WebView's own pan/zoom gesture gets the swipe instead of
+  // the outer ScrollView also scrolling the whole page at the same time.
+  const [scrollEnabled, setScrollEnabled] = useState(true);
   const [pickup, setPickup] = useState<Point>(DEFAULT_PICKUP);
   const [dropoff, setDropoff] = useState<Point>(DEFAULT_DROPOFF);
   const [target, setTarget] = useState<MapTarget>('pickup');
-  const [region, setRegion] = useState<Region>({
-    ...DEFAULT_PICKUP,
-    latitudeDelta: 0.025,
-    longitudeDelta: 0.025,
-  });
+  const [center, setCenter] = useState<{ latitude: number; longitude: number }>(DEFAULT_PICKUP);
   const [locationLoading, setLocationLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
   const [estimate, setEstimate] = useState<FareEstimate | null>(null);
@@ -57,6 +59,11 @@ export default function NewBookingScreen() {
   const [rideTiming, setRideTiming] = useState<'now' | 'later'>('now');
   const [scheduledFor, setScheduledFor] = useState<Date | null>(null);
   const [showPicker, setShowPicker] = useState(false);
+  // Tracks which field (if any) is mid forward-geocode, so the input can
+  // show a small "Locating…" state and getEstimate can be blocked until
+  // it resolves — otherwise a fast tap on "Estimate fare" right after
+  // typing could fire before the coordinates it depends on are ready.
+  const [geocodingTarget, setGeocodingTarget] = useState<MapTarget | null>(null);
 
   const activePoint = target === 'pickup' ? pickup : dropoff;
   const hasAddresses = Boolean(pickup.address.trim() && dropoff.address.trim());
@@ -90,7 +97,8 @@ export default function NewBookingScreen() {
         address: await reverseGeocode(current.coords.latitude, current.coords.longitude),
       };
       setPickup(point);
-      setRegion({ ...point, latitudeDelta: 0.02, longitudeDelta: 0.02 });
+      setCenter(point);
+      mapRef.current?.flyTo(point, 16);
     } catch {
       setError('We could not read your current location. Please choose your pickup on the map.');
     } finally {
@@ -108,13 +116,75 @@ export default function NewBookingScreen() {
   }
 
   function focusPoint(point: Point) {
-    setRegion({ ...point, latitudeDelta: 0.02, longitudeDelta: 0.02 });
+    setCenter(point);
+    mapRef.current?.flyTo(point, 16);
   }
 
   function setAddress(targetPoint: MapTarget, value: string) {
     setEstimate(null);
     if (targetPoint === 'pickup') setPickup((p) => ({ ...p, address: value }));
     else setDropoff((p) => ({ ...p, address: value }));
+  }
+
+  function openSchedulePicker() {
+    const minimumDate = new Date(Date.now() + 30 * 60 * 1000);
+    if (Platform.OS !== 'android') {
+      setShowPicker(true);
+      return;
+    }
+
+    const current = scheduledFor || new Date(Date.now() + 45 * 60 * 1000);
+    DateTimePickerAndroid.open({
+      value: current,
+      mode: 'date',
+      minimumDate,
+      onChange: (event, date) => {
+        if (event.type === 'dismissed' || !date) return;
+
+        const selectedDate = new Date(current);
+        selectedDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+        DateTimePickerAndroid.open({
+          value: selectedDate,
+          mode: 'time',
+          onChange: (timeEvent, time) => {
+            if (timeEvent.type === 'dismissed' || !time) return;
+
+            selectedDate.setHours(time.getHours(), time.getMinutes(), 0, 0);
+            setScheduledFor(selectedDate);
+          },
+        });
+      },
+    });
+  }
+
+  // Free, OS-level forward geocoding (address text -> coordinates) via
+  // expo-location — the same no-cost, no-API-key service already used by
+  // reverseGeocode above, just running the other direction. Fired when the
+  // user finishes editing an address field (onEndEditing), not on every
+  // keystroke, so we're not hammering the geocoder while they're mid-type.
+  async function forwardGeocode(targetPoint: MapTarget, address: string) {
+    const trimmed = address.trim();
+    if (!trimmed) return;
+
+    setGeocodingTarget(targetPoint);
+    setError('');
+    try {
+      const results = await Location.geocodeAsync(trimmed);
+      const hit = results[0];
+      if (!hit) {
+        setError(`Couldn't find a location for "${trimmed}". Try a more specific address, or tap the map instead.`);
+        return;
+      }
+      const point = { latitude: hit.latitude, longitude: hit.longitude, address: trimmed };
+      if (targetPoint === 'pickup') setPickup(point);
+      else setDropoff(point);
+      setEstimate(null);
+      if (target === targetPoint) focusPoint(point);
+    } catch {
+      setError('Address lookup failed. Please check your connection, or tap the map instead.');
+    } finally {
+      setGeocodingTarget(null);
+    }
   }
 
   const coordinates = useMemo(() => ({
@@ -190,26 +260,34 @@ export default function NewBookingScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        scrollEnabled={scrollEnabled}
+      >
         <View>
           <Text style={styles.title}>Book a ride</Text>
           <Text style={styles.subtitle}>Set your pickup and destination on the map.</Text>
         </View>
 
-        <View style={styles.mapCard}>
-          <MapView
-            style={styles.map}
-            region={region}
-            showsUserLocation
-            showsMyLocationButton={false}
-            onMapReady={() => setMapReady(true)}
-            onLongPress={(event) => selectPoint(event.nativeEvent.coordinate.latitude, event.nativeEvent.coordinate.longitude)}
-          >
-            <Marker coordinate={pickup} title="Pickup" description={pickup.address || 'Pickup location'} pinColor={colors.brand} />
-            <Marker coordinate={dropoff} title="Destination" description={dropoff.address || 'Destination'} pinColor="#E85D5D" />
-          </MapView>
+        <View
+          style={styles.mapCard}
+          onTouchStart={() => setScrollEnabled(false)}
+          onTouchEnd={() => setScrollEnabled(true)}
+          onTouchCancel={() => setScrollEnabled(true)}
+        >
+          <LeafletMapPicker
+            ref={mapRef}
+            initialCenter={center}
+            initialZoom={15}
+            pickup={pickup}
+            dropoff={dropoff}
+            onMapPress={(point) => selectPoint(point.latitude, point.longitude)}
+            onReady={() => setMapReady(true)}
+          />
           <View style={styles.mapOverlay} pointerEvents="none">
-            <Text style={styles.mapHint}>Long-press anywhere to place the {target === 'pickup' ? 'pickup' : 'destination'} pin.</Text>
+            <Text style={styles.mapHint}>Tap anywhere to place the {target === 'pickup' ? 'pickup' : 'destination'} pin.</Text>
           </View>
           <View style={styles.mapActions}>
             <Pressable style={[styles.locationButton, locationLoading && styles.disabled]} onPress={loadCurrentLocation} disabled={locationLoading}>
@@ -231,8 +309,22 @@ export default function NewBookingScreen() {
           </Pressable>
         </View>
 
-        <AppInput label="Pickup address" value={pickup.address} onChangeText={(v) => setAddress('pickup', v)} placeholder="Pickup address" />
-        <AppInput label="Destination" value={dropoff.address} onChangeText={(v) => setAddress('dropoff', v)} placeholder="Where are you going?" />
+        <AppInput
+          label="Pickup address"
+          value={pickup.address}
+          onChangeText={(v) => setAddress('pickup', v)}
+          onEndEditing={() => forwardGeocode('pickup', pickup.address)}
+          placeholder="Pickup address"
+        />
+        {geocodingTarget === 'pickup' && <Text style={styles.geocodingHint}>Locating…</Text>}
+        <AppInput
+          label="Destination"
+          value={dropoff.address}
+          onChangeText={(v) => setAddress('dropoff', v)}
+          onEndEditing={() => forwardGeocode('dropoff', dropoff.address)}
+          placeholder="Where are you going?"
+        />
+        {geocodingTarget === 'dropoff' && <Text style={styles.geocodingHint}>Locating…</Text>}
 
         <View style={styles.coordinateCard}>
           <Text style={styles.coordinateTitle}>{target === 'pickup' ? 'Pickup coordinates' : 'Destination coordinates'}</Text>
@@ -271,7 +363,7 @@ export default function NewBookingScreen() {
         </View>
 
         {rideTiming === 'later' && (
-          <Pressable style={styles.coordinateCard} onPress={() => setShowPicker(true)}>
+          <Pressable style={styles.coordinateCard} onPress={openSchedulePicker}>
             <Text style={styles.coordinateTitle}>PICK-UP TIME</Text>
             <Text style={styles.coordinateText}>
               {scheduledFor ? scheduledFor.toLocaleString() : 'Tap to choose a date and time'}
@@ -300,7 +392,7 @@ export default function NewBookingScreen() {
         </View>
 
         {!!error && <Text style={styles.error}>{error}</Text>}
-        <AppButton title="Estimate fare" onPress={getEstimate} loading={loading} disabled={!hasAddresses} />
+        <AppButton title="Estimate fare" onPress={getEstimate} loading={loading} disabled={!hasAddresses || geocodingTarget !== null} />
 
         {estimate && (
           <View style={styles.estimateCard}>
@@ -344,6 +436,7 @@ const styles = StyleSheet.create({
   coordinateCard: { backgroundColor: colors.brandSoft, borderRadius: 12, padding: 10 },
   coordinateTitle: { color: colors.brandDark, fontSize: 11, fontWeight: '900' },
   coordinateText: { color: colors.text, fontSize: 12, marginTop: 3 },
+  geocodingHint: { color: colors.brandDark, fontSize: 12, fontWeight: '700', marginTop: -6 },
   sectionTitle: { fontSize: 16, fontWeight: '900', color: colors.text, marginTop: 3 },
   paymentRow: { flexDirection: 'row', gap: 8 },
   payment: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
