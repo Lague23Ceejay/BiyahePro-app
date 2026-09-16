@@ -73,6 +73,10 @@ BiyahePro - new/                                    ← Root Workspace Directory
 │   │   └── booking/                               ← New booking and driver matching
 │   └── src/                                       ← API, auth session, types, and theme
 │
+├── biyahepro-driver-mobile/                       ← Phase 0: Expo driver mobile app
+│   ├── app/                                       ← Driver auth and operational tabs
+│   └── src/                                       ← API, auth session, types, and theme
+│
 ├── ridehailing-db/                                ← Phase 1: PostgreSQL Database Scripts
 │   ├── 00_extensions.sql                          ← PostGIS/UUID extensions
 │   ├── 01_users.sql                               ← User accounts & authentication

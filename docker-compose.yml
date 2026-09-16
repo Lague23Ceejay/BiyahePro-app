@@ -113,5 +113,33 @@ services:
     ports:
       - "8081:8081"
 
+  driver-mobile:
+    build:
+      context: ./biyahepro-driver-mobile
+      dockerfile: Dockerfile
+    container_name: ridehailing-driver-mobile
+    restart: unless-stopped
+
+    depends_on:
+      - api
+
+    environment:
+      # Expo evaluates EXPO_PUBLIC_API_URL when Metro starts. The app runs on
+      # a physical device, so it must use the host LAN address rather than
+      # host.docker.internal, which is only resolvable inside Docker.
+      EXPO_PUBLIC_API_URL: http://${HOST_LAN_IP}:5000
+      REACT_NATIVE_PACKAGER_HOSTNAME: ${HOST_LAN_IP}
+      CHOKIDAR_USEPOLLING: "true"
+
+    tty: true
+    stdin_open: true
+
+    volumes:
+      - ./biyahepro-driver-mobile:/app
+      - /app/node_modules
+
+    ports:
+      - "8082:8082"
+
 volumes:
   ridehailing-postgres-data:
