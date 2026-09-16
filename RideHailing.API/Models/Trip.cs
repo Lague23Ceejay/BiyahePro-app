@@ -131,3 +131,20 @@ public record TripSummaryResponse(
 );
 
 public record RatingResult(bool Success, string? Error);
+
+// One row of "incoming ride requests" for a driver's home screen — a
+// pending (status = 'requested') trip within their accept radius that
+// matches their registered vehicle type. Extra columns TripColumns
+// selects (payment_method, cancelled_by, etc.) that aren't declared here
+// are simply ignored by Dapper — no need for a narrower SELECT list.
+public record PendingTripResponse
+{
+    public Guid Id { get; init; }
+    public string PickupAddress { get; init; } = "";
+    public string DropoffAddress { get; init; } = "";
+    public decimal FareAmount { get; init; }
+    public decimal DistanceKm { get; init; }
+    public string CustomerName { get; init; } = "";
+    public DateTime RequestedAt { get; init; }
+    public int MinutesAway { get; set; }
+}

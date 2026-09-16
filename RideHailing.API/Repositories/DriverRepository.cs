@@ -17,6 +17,7 @@ public interface IDriverRepository
     Task<DriverStrike?> AddStrikeAsync(Guid driverId, string reason, Guid issuedBy);
     Task<List<DriverStrike>> GetStrikesAsync(Guid driverId);
     Task LiftSuspensionAsync(Guid driverId);
+    Task<DriverEarningsResponse> GetEarningsSummaryAsync(Guid driverId);
 }
 
 public class DriverRepository(IConfiguration config) : IDriverRepository
@@ -133,4 +134,94 @@ public class DriverRepository(IConfiguration config) : IDriverRepository
             "UPDATE drivers SET status = 'offline', suspended_until = NULL, updated_at = NOW() WHERE id = @DriverId AND status = 'suspended'",
             new { DriverId = driverId });
     }
+
+    // ── Earnings summary (driver "Earnings" screen) ─────────────────
+// Computed from completed trips' fare_amount directly — there's no
+// commission/payout ledger in the schema yet, so this is a live
+// aggregation, not a record of an actual settled payout.
+public async Task<DriverEarningsResponse> GetEarningsSummaryAsync(Guid driverId)
+{
+    using var db = Connection();
+
+    var totals = await db.QuerySingleAsync<(decimal TotalEarnings, int TotalTrips)>(
+        @"SELECT COALESCE(SUM(fare_amount), 0) AS total_earnings, COUNT(*)::int AS total_trips
+          FROM trips WHERE driver_id = @DriverId AND status = 'completed'",
+        new { DriverId = driverId });
+
+    var week = await db.QuerySingleAsync<(decimal WeekEarnings, int WeekTrips)>(
+        @"SELECT COALESCE(SUM(fare_amount), 0) AS week_earnings, COUNT(*)::int AS week_trips
+          FROM trips
+          WHERE driver_id = @DriverId AND status = 'completed'
+            AND date_trunc('week', completed_at) = date_trunc('week', NOW())",
+        new { DriverId = driverId });
+
+    var priorWeekEarnings = await db.QuerySingleAsync<decimal>(
+        @"SELECT COALESCE(SUM(fare_amount), 0)
+          FROM trips
+          WHERE driver_id = @DriverId AND status = 'completed'
+            AND date_trunc('week', completed_at) = date_trunc('week', NOW()) - INTERVAL '7 days'",
+        new { DriverId = driverId });
+
+    decimal? weekChangePercent = priorWeekEarnings > 0
+        ? Math.Round((week.WeekEarnings - priorWeekEarnings) / priorWeekEarnings * 100, 0)
+        : null;
+
+    var averages = await db.QuerySingleAsync<(decimal AvgFare, double AvgMinutes)>(
+        @"SELECT COALESCE(AVG(fare_amount), 0) AS avg_fare, COALESCE(AVG(duration_minutes), 0) AS avg_minutes
+          FROM trips WHERE driver_id = @DriverId AND status = 'completed'",
+        new { DriverId = driverId });
+
+    var completion = await db.QuerySingleAsync<(int Completed, int Total)>(
+        @"SELECT
+            COUNT(*)::int FILTER (WHERE status = 'completed') AS completed,
+            COUNT(*)::int FILTER (WHERE status IN ('completed', 'cancelled')) AS total
+          FROM trips WHERE driver_id = @DriverId",
+        new { DriverId = driverId });
+    var completionRate = completion.Total > 0 ? (int)Math.Round(100.0 * completion.Completed / completion.Total) : 100;
+
+    // Mon..Sun of the current calendar week, zero-filled for days with
+    // no completed trips yet (so the chart always has 7 bars).
+    var dailyRows = (await db.QueryAsync<(DateTime Day, decimal Earnings, int Trips)>(
+        @"SELECT completed_at::date AS day, SUM(fare_amount) AS earnings, COUNT(*)::int AS trips
+          FROM trips
+          WHERE driver_id = @DriverId AND status = 'completed'
+            AND date_trunc('week', completed_at) = date_trunc('week', NOW())
+          GROUP BY completed_at::date",
+        new { DriverId = driverId })).ToDictionary(r => DateOnly.FromDateTime(r.Day));
+
+    var weekStart = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-(int)DateTime.UtcNow.DayOfWeek + (DateTime.UtcNow.DayOfWeek == DayOfWeek.Sunday ? -6 : 1)));
+    var dailyEarnings = Enumerable.Range(0, 7).Select(i =>
+    {
+        var date = weekStart.AddDays(i);
+        dailyRows.TryGetValue(date, out var row);
+        return new DailyEarningsPoint(date.ToString("ddd"), date, row.Earnings, row.Trips);
+    }).ToList();
+
+    // Last 5 days with at least one completed trip, most recent first —
+    // stands in for a "Daily Payouts" list until a real payout ledger exists.
+    var payoutRows = await db.QueryAsync<(DateTime Day, decimal Earnings, int Trips)>(
+        @"SELECT completed_at::date AS day, SUM(fare_amount) AS earnings, COUNT(*)::int AS trips
+          FROM trips
+          WHERE driver_id = @DriverId AND status = 'completed'
+          GROUP BY completed_at::date
+          ORDER BY day DESC
+          LIMIT 5",
+        new { DriverId = driverId });
+    var recentPayouts = payoutRows
+        .Select(r => new DailyEarningsPoint(r.Day.ToString("MMM d"), DateOnly.FromDateTime(r.Day), r.Earnings, r.Trips))
+        .ToList();
+
+    return new DriverEarningsResponse(
+        TotalEarnings: totals.TotalEarnings,
+        TotalTrips: totals.TotalTrips,
+        WeekEarnings: week.WeekEarnings,
+        WeekTrips: week.WeekTrips,
+        WeekEarningsChangePercent: weekChangePercent,
+        AvgFare: Math.Round(averages.AvgFare, 2),
+        AvgTimeMinutes: (int)Math.Round(averages.AvgMinutes),
+        CompletionRatePercent: completionRate,
+        DailyEarnings: dailyEarnings,
+        RecentPayouts: recentPayouts
+    );
+}
 }

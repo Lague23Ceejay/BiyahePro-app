@@ -15,7 +15,7 @@ namespace RideHailing.API.Controllers;
 [ApiController]
 [Route("api/drivers")]
 [Authorize]
-public class DriversController(IDriverRepository driverRepo, IDriverService driverService) : ControllerBase
+public class DriversController(IDriverRepository driverRepo, IDriverService driverService, ITripService tripService) : ControllerBase
 {
     // GET: api/drivers/me (Allows an authenticated driver to view their metrics)
     [HttpGet("me")]
@@ -30,6 +30,57 @@ public class DriversController(IDriverRepository driverRepo, IDriverService driv
         if (driver == null) return NotFound(new { message = "Driver profile card not found." });
         
         return Ok(driver);
+    }
+
+    // PATCH: api/drivers/me/status (Online/offline toggle — the switch on the driver home screen)
+    [HttpPatch("me/status")]
+    [Authorize(Roles = "driver")]
+    public async Task<IActionResult> SetMyStatus([FromBody] SetAvailabilityRequest req)
+    {
+        var claimId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (claimId == null) return Unauthorized();
+
+        var success = await driverService.SetAvailabilityAsync(Guid.Parse(claimId), req.Available);
+        if (!success) return BadRequest(new { message = "Unable to change availability — driver not found, suspended, or banned." });
+        return NoContent();
+    }
+
+    // PATCH: api/drivers/me/location (Periodic ping from the driver app so nearby-request/nearby-driver lookups stay current)
+    [HttpPatch("me/location")]
+    [Authorize(Roles = "driver")]
+    public async Task<IActionResult> UpdateMyLocation([FromBody] UpdateLocationRequest req)
+    {
+        var claimId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (claimId == null) return Unauthorized();
+
+        var success = await driverService.UpdateLocationAsync(Guid.Parse(claimId), req.Latitude, req.Longitude);
+        if (!success) return NotFound(new { message = "Driver profile not found." });
+        return NoContent();
+    }
+
+    // GET: api/drivers/me/requests (Incoming ride requests — pending trips near the driver, matching their vehicle type)
+    [HttpGet("me/requests")]
+    [Authorize(Roles = "driver")]
+    public async Task<IActionResult> GetMyRequests()
+    {
+        var claimId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (claimId == null) return Unauthorized();
+
+        var requests = await tripService.GetPendingRequestsForDriverAsync(Guid.Parse(claimId));
+        return Ok(requests);
+    }
+
+    // GET: api/drivers/me/earnings (Earnings screen — totals, this week's breakdown, recent daily summaries)
+    [HttpGet("me/earnings")]
+    [Authorize(Roles = "driver")]
+    public async Task<IActionResult> GetMyEarnings()
+    {
+        var claimId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (claimId == null) return Unauthorized();
+
+        var earnings = await driverService.GetEarningsAsync(Guid.Parse(claimId));
+        if (earnings == null) return NotFound(new { message = "Driver profile not found." });
+        return Ok(earnings);
     }
 
     // GET: api/drivers (Admin-only panel to review the entire fleet status)

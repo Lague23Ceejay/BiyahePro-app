@@ -20,6 +20,8 @@ public interface IDriverService
     Task<List<NearbyDriverResponse>> GetNearbyAsync(double lat, double lng);
     Task<DriverStrike?>              IssueStrikeAsync(Guid driverId, Guid adminId, string reason);
     Task<List<DriverStrike>>         GetStrikesAsync(Guid driverId);
+    Task<bool> UpdateLocationAsync(Guid userId, double lat, double lng);
+    Task<DriverEarningsResponse?> GetEarningsAsync(Guid userId);
 }
 
 public class DriverService(
@@ -124,5 +126,21 @@ public class DriverService(
     {
         var radiusKm = await settings.GetIntAsync(SettingKeys.OpsDriverRadius, 5);
         return await driverRepo.GetNearbyAsync(lat, lng, radiusKm);
+    }
+
+    public async Task<bool> UpdateLocationAsync(Guid userId, double lat, double lng)
+{
+    var driver = await driverRepo.GetByUserIdAsync(userId);
+    if (driver == null) return false;
+
+    await driverRepo.UpdateLocationAsync(driver.Id, lat, lng);
+    return true;
+}
+
+    public async Task<DriverEarningsResponse?> GetEarningsAsync(Guid userId)
+    {
+        var driver = await driverRepo.GetByUserIdAsync(userId);
+        if (driver == null) return null;
+        return await driverRepo.GetEarningsSummaryAsync(driver.Id);
     }
 }

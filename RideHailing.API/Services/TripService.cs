@@ -16,6 +16,7 @@ public interface ITripService
     Task<PagedResult<Trip>> GetTripHistoryAsync(Guid userId, string role, int page, int pageSize);
     Task<RatingResult> RateTripAsync(Guid tripId, Guid actorId, string role, int score, string? comment);
     Task<List<NearbyDriverResponse>> GetNearbyDriversAsync(double lat, double lng);
+    Task<List<PendingTripResponse>> GetPendingRequestsForDriverAsync(Guid driverUserId);
     
     Task ActivateDueScheduledTripsAsync();
 }
@@ -274,4 +275,30 @@ public class TripService(
         var radiusKm = await settings.GetIntAsync(SettingKeys.OpsDriverRadius, 5);
         return await driverRepo.GetNearbyAsync(lat, lng, radiusKm);
     }
+
+    // ── Driver home screen: "Incoming Requests" ─────────────────────
+// Reuses the same driver-accept radius setting GetNearbyDriversAsync
+// uses for the mirror-image lookup (customer finding nearby drivers),
+// so the two stay consistent by construction rather than by two
+// independently-tuned numbers.
+public async Task<List<PendingTripResponse>> GetPendingRequestsForDriverAsync(Guid driverUserId)
+{
+    var driver = await driverRepo.GetByUserIdAsync(driverUserId);
+    if (driver == null || driver.Latitude == null || driver.Longitude == null)
+        return [];
+
+    var vehicle = await driverRepo.GetVehicleAsync(driver.Id);
+    if (vehicle == null) return [];
+
+    var radiusKm = await settings.GetIntAsync(SettingKeys.OpsDriverRadius, 5);
+    var requests = await tripRepo.GetPendingNearbyAsync(vehicle.VehicleType, driver.Latitude.Value, driver.Longitude.Value, radiusKm);
+
+    // Same 25 km/h assumption as FareService's ETA calculation —
+    // "minutes away" here means minutes for the driver to reach
+    // pickup, not the trip's own estimated duration.
+    foreach (var r in requests)
+        r.MinutesAway = (int)Math.Ceiling((double)r.DistanceKm / 25.0 * 60);
+
+    return requests;
+}
 }

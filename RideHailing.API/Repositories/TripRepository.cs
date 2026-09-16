@@ -15,11 +15,35 @@ public interface ITripRepository
     Task<List<Trip>> GetDueScheduledTripsAsync();
     Task ActivateScheduledTripAsync(Guid tripId);
     Task<bool> HasRatingAsync(Guid tripId, Guid ratedBy);
+    Task<List<PendingTripResponse>> GetPendingNearbyAsync(string vehicleType, double driverLat, double driverLng, int radiusKm);
     Task AddRatingAsync(Guid tripId, Guid ratedBy, Guid ratedUser, int score, string? comment);
 }
 
 public class TripRepository(IConfiguration config) : ITripRepository
 {
+    public async Task<List<PendingTripResponse>> GetPendingNearbyAsync(string vehicleType, double driverLat, double driverLng, int radiusKm)
+{
+    using var db = Connection();
+    var sql = $@"
+        SELECT {TripColumns}, {LatLngSelectExpr},
+            uc.full_name AS customer_name,
+            ROUND((ST_Distance(t.pickup_location, ST_SetSRID(ST_MakePoint(@Lng, @Lat), 4326)::geography) / 1000)::numeric, 2) AS distance_km
+        FROM trips t
+        JOIN users uc ON uc.id = t.customer_id
+        WHERE t.status = 'requested'
+          AND t.vehicle_type = @VehicleType
+          AND ST_DWithin(t.pickup_location, ST_SetSRID(ST_MakePoint(@Lng, @Lat), 4326)::geography, @RadiusMeters)
+        ORDER BY distance_km ASC
+        LIMIT 20";
+    var result = await db.QueryAsync<PendingTripResponse>(sql, new
+    {
+        VehicleType = vehicleType,
+        Lat = driverLat,
+        Lng = driverLng,
+        RadiusMeters = radiusKm * 1000
+    });
+    return result.ToList();
+}
     private NpgsqlConnection Connection() => new(config.GetConnectionString("DefaultConnection"));
 
     // Reused by GetByIdAsync/GetHistoryAsync/CreateAsync's RETURNING clause.

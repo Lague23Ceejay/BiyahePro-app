@@ -130,3 +130,29 @@ public record DriverStatusResponse(
     short   StrikeCount,
     DateTime? SuspendedUntil
 );
+
+// Driver home-screen "Online" switch.
+public record SetAvailabilityRequest(bool Available);
+
+// Periodic location ping from the driver app.
+public record UpdateLocationRequest(double Latitude, double Longitude);
+
+// Driver "Earnings" screen. Earnings here are the full trip fare, not
+// net of any platform commission — there's no commission/payout ledger
+// in the schema yet (see BP §V "15% commission" for the eventual real
+// number), so this is a computed summary over completed trips, not an
+// actual settled-payout record.
+public record DailyEarningsPoint(string DayLabel, DateOnly Date, decimal Earnings, int Trips);
+
+public record DriverEarningsResponse(
+    decimal TotalEarnings,
+    int     TotalTrips,
+    decimal WeekEarnings,
+    int     WeekTrips,
+    decimal? WeekEarningsChangePercent,
+    decimal AvgFare,
+    int     AvgTimeMinutes,
+    int     CompletionRatePercent,
+    List<DailyEarningsPoint> DailyEarnings,
+    List<DailyEarningsPoint> RecentPayouts
+);
