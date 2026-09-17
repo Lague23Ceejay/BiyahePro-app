@@ -5,6 +5,7 @@ export type AuthResponse = {
   role: 'customer' | 'driver' | 'admin';
   userId: string;
   fullName: string;
+  rememberDevice?: boolean;
 };
 
 export type RegisterPayload = {

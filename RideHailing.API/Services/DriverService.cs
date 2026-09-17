@@ -22,6 +22,7 @@ public interface IDriverService
     Task<List<DriverStrike>>         GetStrikesAsync(Guid driverId);
     Task<bool> UpdateLocationAsync(Guid userId, double lat, double lng);
     Task<DriverEarningsResponse?> GetEarningsAsync(Guid userId);
+    Task<Driver?> CompleteProfileAsync(Guid userId, CompleteDriverProfileRequest request);
 }
 
 public class DriverService(
@@ -142,5 +143,15 @@ public class DriverService(
         var driver = await driverRepo.GetByUserIdAsync(userId);
         if (driver == null) return null;
         return await driverRepo.GetEarningsSummaryAsync(driver.Id);
+    }
+
+    public async Task<Driver?> CompleteProfileAsync(Guid userId, CompleteDriverProfileRequest request)
+    {
+        if (request.VehicleType is not ("motorcycle" or "motorcab") || request.Year < 1900 || request.Year > DateTime.UtcNow.Year + 1)
+            return null;
+
+        return await driverRepo.SaveProfileAsync(userId, request.LicenseNumber.Trim(), request.LicenseExpiry,
+            request.PlateNumber.Trim(), request.Make.Trim(), request.Model.Trim(), request.Color.Trim(),
+            request.Year, request.VehicleType);
     }
 }

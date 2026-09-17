@@ -15,10 +15,12 @@ public interface IAuthService
     Task<AuthResponse?> LoginAsync(LoginRequest request);
     Task<AuthResponse?> RefreshTokenAsync(string refreshToken);
     Task RevokeRefreshTokenAsync(string refreshToken);
+    Task<(AuthResponse? Response, string? Error)> RegisterDriverAsync(RegisterDriverRequest request);
 }
 
 public class AuthService(
     IUserRepository userRepo,
+    IDriverRepository driverRepo,
     IConfiguration config) : IAuthService
 {
     public async Task<(AuthResponse? Response, string? Error)> RegisterAsync(RegisterRequest request)
@@ -58,6 +60,62 @@ public class AuthService(
             // that this method doesn't explicitly check for yet.
             return (null, "Email or phone number already registered.");
         }
+    }
+
+    // Driver self-registration — creates the users row, the matching
+// drivers row, and the vehicle row together. Previously the driver
+// app called the generic RegisterAsync above with role="driver",
+// which only ever created a users row: every driver-specific
+// endpoint (/api/drivers/me and everything under it) 404'd
+// immediately afterward since no drivers row ever existed.
+    public async Task<(AuthResponse? Response, string? Error)> RegisterDriverAsync(RegisterDriverRequest request)
+    {
+        var email = request.Email.ToLowerInvariant();
+
+        if (await userRepo.GetByEmailAsync(email) != null)
+            return (null, "Email already exists.");
+        if (await userRepo.GetByPhoneAsync(request.Phone) != null)
+            return (null, "Phone number already registered.");
+
+        var user = new User
+        {
+            FullName     = request.FullName,
+            Email        = email,
+            Phone        = request.Phone,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+            Role         = "driver",
+        };
+
+        User created;
+        try
+        {
+            created = await userRepo.CreateAsync(user);
+        }
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == Npgsql.PostgresErrorCodes.UniqueViolation)
+        {
+            return (null, "Email or phone number already registered.");
+        }
+
+        Driver driver;
+        try
+        {
+            driver = await driverRepo.CreateAsync(created.Id, request.LicenseNumber, request.LicenseExpiry);
+        }
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == Npgsql.PostgresErrorCodes.UniqueViolation)
+        {
+            return (null, "License number already registered.");
+        }
+
+        try
+        {
+            await driverRepo.CreateVehicleAsync(driver.Id, request.PlateNumber, request.Make, request.Model, request.Color, request.Year, request.VehicleType);
+        }
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == Npgsql.PostgresErrorCodes.UniqueViolation)
+        {
+            return (null, "Plate number already registered.");
+        }
+
+        return (BuildAuthResponse(created), null);
     }
 
     public async Task<AuthResponse?> LoginAsync(LoginRequest request)

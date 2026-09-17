@@ -49,7 +49,7 @@ async function refreshAccessToken() {
     method: 'POST',
     body: JSON.stringify(session.refreshToken),
   }, undefined, false);
-  await saveSession(refreshed);
+  await saveSession({ ...refreshed, rememberDevice: session.rememberDevice });
   return refreshed.accessToken;
 }
 

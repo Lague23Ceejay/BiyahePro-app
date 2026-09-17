@@ -17,6 +17,15 @@ public class AuthController(IAuthService authService) : ControllerBase
         return Ok(result);
     }
 
+    // POST: api/auth/register-driver (Creates the user, driver profile, and vehicle together)
+    [HttpPost("register-driver")]
+    public async Task<IActionResult> RegisterDriver([FromBody] RegisterDriverRequest request)
+    {
+        var (result, error) = await authService.RegisterDriverAsync(request);
+        if (result == null) return BadRequest(new { message = error ?? "Driver registration failed." });
+        return Ok(result);
+    }
+
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {

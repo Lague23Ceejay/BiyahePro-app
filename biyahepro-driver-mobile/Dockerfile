@@ -9,10 +9,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 COPY . .
 
 EXPOSE 8082
 
-CMD ["sh", "-c", "npm install && npx expo start --host lan --port 8082"]
+CMD ["npx", "expo", "start", "--host", "lan", "--port", "8082"]

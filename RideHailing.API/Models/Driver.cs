@@ -98,6 +98,17 @@ public record RegisterDriverRequest(
     string   VehicleType = "motorcycle"
 );
 
+public record CompleteDriverProfileRequest(
+    string LicenseNumber,
+    DateOnly LicenseExpiry,
+    string PlateNumber,
+    string Make,
+    string Model,
+    string Color,
+    short Year,
+    string VehicleType = "motorcycle"
+);
+
 public record IssueStrikeRequest(
     // See the note on RegisterRequest.Password in User.cs — attributes on
     // a record's primary constructor parameter must NOT use a

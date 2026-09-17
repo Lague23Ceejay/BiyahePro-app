@@ -225,9 +225,13 @@ public class TripService(
         if (trip.DriverId.HasValue)
             await driverRepo.UpdateStatusAsync(trip.DriverId.Value, "available");
 
-        await hub.Clients.Group($"user_{trip.CustomerId}").SendAsync("TripCancelled", new { TripId = tripId });
-        if (trip.DriverId.HasValue)
-            await hub.Clients.Group($"user_{trip.DriverId}").SendAsync("TripCancelled", new { TripId = tripId });
+            if (trip.DriverId.HasValue)
+            {
+                var driver = await driverRepo.GetByIdAsync(trip.DriverId.Value);
+                if (driver != null)
+                    await hub.Clients.Group($"user_{driver.UserId}").SendAsync("TripCancelled", new { TripId = tripId });
+            }
+            await hub.Clients.Group($"user_{trip.CustomerId}").SendAsync("TripCancelled", new { TripId = tripId });
 
         return trip;
     }

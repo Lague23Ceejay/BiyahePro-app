@@ -18,6 +18,9 @@ public interface IDriverRepository
     Task<List<DriverStrike>> GetStrikesAsync(Guid driverId);
     Task LiftSuspensionAsync(Guid driverId);
     Task<DriverEarningsResponse> GetEarningsSummaryAsync(Guid driverId);
+    Task<Driver> CreateAsync(Guid userId, string licenseNumber, DateOnly licenseExpiry);
+Task CreateVehicleAsync(Guid driverId, string plateNumber, string make, string model, string color, short year, string vehicleType);
+    Task<Driver> SaveProfileAsync(Guid userId, string licenseNumber, DateOnly licenseExpiry, string plateNumber, string make, string model, string color, short year, string vehicleType);
 }
 
 public class DriverRepository(IConfiguration config) : IDriverRepository
@@ -224,4 +227,73 @@ public async Task<DriverEarningsResponse> GetEarningsSummaryAsync(Guid driverId)
         RecentPayouts: recentPayouts
     );
 }
+
+    // ── Driver self-registration ─────────────────────────────────────
+    // Not wrapped in a single DB transaction across CreateAsync +
+    // CreateVehicleAsync (each opens its own connection) — consistent with
+    // the rest of this codebase's style (e.g. TripService.AcceptAsync also
+    // makes sequential repo calls without an explicit transaction). A failure
+    // between the two inserts would leave an orphaned driver row with no
+    // vehicle; AuthService.RegisterDriverAsync surfaces that as a clear
+    // error rather than silently succeeding.
+    public async Task<Driver> CreateAsync(Guid userId, string licenseNumber, DateOnly licenseExpiry)
+    {
+        using var db = Connection();
+        var sql = @"
+            INSERT INTO drivers (user_id, license_number, license_expiry)
+            VALUES (@UserId, @LicenseNumber, @LicenseExpiry)
+            RETURNING id, user_id, license_number, license_expiry, status, rating,
+                    dpi_review_flag, strike_count, suspended_until, total_trips,
+                    is_documents_verified, created_at, updated_at,
+                    NULL::float8 AS latitude, NULL::float8 AS longitude";
+        return await db.QuerySingleAsync<Driver>(sql, new { UserId = userId, LicenseNumber = licenseNumber, LicenseExpiry = licenseExpiry });
+    }
+
+    public async Task CreateVehicleAsync(Guid driverId, string plateNumber, string make, string model, string color, short year, string vehicleType)
+    {
+        using var db = Connection();
+        await db.ExecuteAsync(
+            @"INSERT INTO vehicles (driver_id, plate_number, make, model, color, year, vehicle_type)
+            VALUES (@DriverId, @PlateNumber, @Make, @Model, @Color, @Year, @VehicleType)",
+            new { DriverId = driverId, PlateNumber = plateNumber, Make = make, Model = model, Color = color, Year = year, VehicleType = vehicleType });
+    }
+
+    public async Task<Driver> SaveProfileAsync(Guid userId, string licenseNumber, DateOnly licenseExpiry, string plateNumber, string make, string model, string color, short year, string vehicleType)
+    {
+        using var db = Connection();
+        await db.OpenAsync();
+        await using var transaction = await db.BeginTransactionAsync();
+
+        var driverId = await db.ExecuteScalarAsync<Guid?>(
+            "SELECT id FROM drivers WHERE user_id = @UserId FOR UPDATE",
+            new { UserId = userId }, transaction);
+
+        if (driverId.HasValue)
+        {
+            await db.ExecuteAsync(
+                "UPDATE drivers SET license_number = @LicenseNumber, license_expiry = @LicenseExpiry WHERE id = @DriverId",
+                new { DriverId = driverId.Value, LicenseNumber = licenseNumber, LicenseExpiry = licenseExpiry }, transaction);
+        }
+        else
+        {
+            driverId = await db.ExecuteScalarAsync<Guid>(
+                "INSERT INTO drivers (user_id, license_number, license_expiry) VALUES (@UserId, @LicenseNumber, @LicenseExpiry) RETURNING id",
+                new { UserId = userId, LicenseNumber = licenseNumber, LicenseExpiry = licenseExpiry }, transaction);
+        }
+
+        await db.ExecuteAsync(
+            @"INSERT INTO vehicles (driver_id, plate_number, make, model, color, year, vehicle_type)
+              VALUES (@DriverId, @PlateNumber, @Make, @Model, @Color, @Year, @VehicleType)
+              ON CONFLICT (driver_id) DO UPDATE SET
+                plate_number = EXCLUDED.plate_number, make = EXCLUDED.make, model = EXCLUDED.model,
+                color = EXCLUDED.color, year = EXCLUDED.year, vehicle_type = EXCLUDED.vehicle_type,
+                is_active = true",
+            new { DriverId = driverId.Value, PlateNumber = plateNumber, Make = make, Model = model, Color = color, Year = year, VehicleType = vehicleType }, transaction);
+
+        var result = await db.QuerySingleAsync<Driver>(
+            "SELECT d.*, NULL::float8 AS latitude, NULL::float8 AS longitude FROM drivers d WHERE d.id = @DriverId",
+            new { DriverId = driverId.Value }, transaction);
+        await transaction.CommitAsync();
+        return result;
+    }
 }

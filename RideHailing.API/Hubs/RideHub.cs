@@ -23,9 +23,13 @@ public class RideHub(IDriverRepository driverRepo) : Hub
             // Give every user an isolated private room for personal booking status pings
             await Groups.AddToGroupAsync(Context.ConnectionId, $"user_{userId}");
 
-            // If the user profile is a driver, join them to the broadcast pool for new rides
-            if (role == "driver")
-                await Groups.AddToGroupAsync(Context.ConnectionId, "available_drivers");
+            // Only online drivers receive new ride broadcasts.
+            if (role == "driver" && Guid.TryParse(userId, out var parsedUserId))
+            {
+                var driver = await driverRepo.GetByUserIdAsync(parsedUserId);
+                if (driver?.Status == "available")
+                    await Groups.AddToGroupAsync(Context.ConnectionId, "available_drivers");
+            }
         }
 
         await base.OnConnectedAsync();

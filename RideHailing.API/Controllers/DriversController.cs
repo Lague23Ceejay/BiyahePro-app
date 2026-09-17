@@ -6,8 +6,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Npgsql;
 using RideHailing.API.Models;
-using RideHailing.API.Repositories;
 using RideHailing.API.Services;
 
 namespace RideHailing.API.Controllers;
@@ -15,7 +15,7 @@ namespace RideHailing.API.Controllers;
 [ApiController]
 [Route("api/drivers")]
 [Authorize]
-public class DriversController(IDriverRepository driverRepo, IDriverService driverService, ITripService tripService) : ControllerBase
+public class DriversController(IDriverService driverService, ITripService tripService) : ControllerBase
 {
     // GET: api/drivers/me (Allows an authenticated driver to view their metrics)
     [HttpGet("me")]
@@ -30,6 +30,24 @@ public class DriversController(IDriverRepository driverRepo, IDriverService driv
         if (driver == null) return NotFound(new { message = "Driver profile card not found." });
         
         return Ok(driver);
+    }
+
+    [HttpPut("me/profile")]
+    [Authorize(Roles = "driver")]
+    public async Task<IActionResult> CompleteProfile([FromBody] CompleteDriverProfileRequest request)
+    {
+        var claimId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (claimId == null || !Guid.TryParse(claimId, out var userId)) return Unauthorized();
+
+        try
+        {
+            var driver = await driverService.CompleteProfileAsync(userId, request);
+            return driver == null ? BadRequest(new { message = "Invalid driver profile details." }) : Ok(driver);
+        }
+        catch (Npgsql.PostgresException ex) when (ex.SqlState == Npgsql.PostgresErrorCodes.UniqueViolation)
+        {
+            return Conflict(new { message = "License number or plate number is already registered." });
+        }
     }
 
     // PATCH: api/drivers/me/status (Online/offline toggle — the switch on the driver home screen)

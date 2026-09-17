@@ -25,7 +25,7 @@ export const api = {
     return response.json() as Promise<LoginResponse>;
   },
   async register(payload: RegisterPayload) {
-    const response = await fetch(`${API_BASE_URL}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const response = await fetch(`${API_BASE_URL}/api/auth/register-driver`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     if (!response.ok) {
       const body = await response.json().catch(() => null) as { message?: string; errors?: Record<string, string[]> } | null;
       const validation = body?.errors ? Object.values(body.errors).flat()[0] : undefined;
@@ -34,9 +34,13 @@ export const api = {
     return response.json() as Promise<LoginResponse>;
   },
   async getProfile(token: string) { return request<any>('/api/drivers/me', {}, token); },
+  async completeProfile(token: string, payload: { licenseNumber: string; licenseExpiry: string; plateNumber: string; make: string; model: string; color: string; year: number; vehicleType: 'motorcycle' | 'motorcab' }) { return request<any>('/api/drivers/me/profile', { method: 'PUT', body: JSON.stringify(payload) }, token); },
   async getRequests(token: string) { return request<any[]>('/api/drivers/me/requests', {}, token); },
   async getHistory(token: string) { return request<any>('/api/trips/history?page=1&pageSize=20', {}, token); },
   async getEarnings(token: string) { return request<any>('/api/drivers/me/earnings', {}, token); },
   async setAvailability(token: string, available: boolean) { return request<void>('/api/drivers/me/status', { method: 'PATCH', body: JSON.stringify({ available }) }, token); },
+  async updateLocation(token: string, latitude: number, longitude: number) { return request<void>('/api/drivers/me/location', { method: 'PATCH', body: JSON.stringify({ latitude, longitude }) }, token); },
+  async updateTripStatus(token: string, tripId: string, status: string) { return request<any>(`/api/trips/${tripId}/status`, { method: 'PATCH', body: JSON.stringify({ tripId, status }) }, token); },
   async acceptTrip(token: string, tripId: string) { return request<any>(`/api/trips/${tripId}/accept`, { method: 'POST' }, token); },
+  async declineTrip(token: string, tripId: string) { return request<any>(`/api/trips/${tripId}/cancel`, { method: 'POST', body: JSON.stringify({ reason: 'Driver declined the request.' }) }, token); },
 };

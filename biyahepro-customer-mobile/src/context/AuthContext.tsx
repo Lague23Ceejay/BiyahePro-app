@@ -6,8 +6,8 @@ import type { AuthResponse, RegisterPayload } from '@/src/types/api';
 type AuthContextValue = {
   session: AuthResponse | null;
   isLoading: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
-  register: (payload: RegisterPayload) => Promise<void>;
+  signIn: (email: string, password: string, rememberDevice: boolean) => Promise<void>;
+  register: (payload: RegisterPayload, rememberDevice: boolean) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -27,17 +27,19 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const value = useMemo<AuthContextValue>(() => ({
     session,
     isLoading,
-    async signIn(email, password) {
+    async signIn(email, password, rememberDevice) {
       const next = await api.login(email.trim(), password);
       if (next.role !== 'customer') throw new Error('Please use a customer account in this app.');
-      await saveSession(next);
-      setSession(next);
+      const saved = { ...next, rememberDevice };
+      if (rememberDevice) await saveSession(saved); else await clearSession();
+      setSession(saved);
     },
-    async register(payload) {
+    async register(payload, rememberDevice) {
       const next = await api.register(payload);
       if (next.role !== 'customer') throw new Error('Customer registration failed.');
-      await saveSession(next);
-      setSession(next);
+      const saved = { ...next, rememberDevice };
+      if (rememberDevice) await saveSession(saved); else await clearSession();
+      setSession(saved);
     },
     async signOut() {
       await clearSession();

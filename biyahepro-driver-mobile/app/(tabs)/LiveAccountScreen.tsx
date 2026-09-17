@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { AppButton } from '@/src/components/AppButton';
 import { useAuth } from '@/src/context/AuthContext';
 import { api } from '@/src/lib/api';
 import { colors } from '@/src/theme/colors';
 
 export default function LiveAccountScreen() {
-  const { session } = useAuth();
+  const { session, signOut } = useAuth();
   const [profile, setProfile] = useState<any>(null);
   const [earnings, setEarnings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -26,6 +28,8 @@ export default function LiveAccountScreen() {
     <View style={styles.stats}><Stat value={String(profile?.totalTrips ?? 0)} label="Total Trips" /><Stat value={Number(profile?.rating ?? 0).toFixed(1)} label="Rating" /><Stat value={`P${Number(earnings?.totalEarnings ?? 0).toFixed(2)}`} label="Earnings" /></View>
     <View style={styles.card}><Text style={styles.cardTitle}>Verification</Text><Text style={styles.detail}>{profile?.isDocumentsVerified ? 'All documents approved' : 'Documents pending review'}</Text></View>
     <View style={styles.card}><Text style={styles.cardTitle}>Vehicle</Text><Text style={styles.detail}>{vehicle ? `${vehicle.vehicleType} · ${vehicle.plateNumber}` : 'Not registered'}</Text></View>
+    {(!profile?.licenseNumber || !vehicle) && <AppButton title="Complete your profile" onPress={() => router.push('/profile/complete' as never)} />}
+    <Pressable style={{ margin: 18, borderWidth: 1, borderColor: colors.danger, borderRadius: 12, minHeight: 46, alignItems: 'center', justifyContent: 'center' }} onPress={signOut}><Text style={{ color: colors.danger, fontWeight: '900' }}>Sign Out</Text></Pressable>
   </ScrollView>;
 }
 
