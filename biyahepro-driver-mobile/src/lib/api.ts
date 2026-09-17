@@ -14,7 +14,11 @@ export async function getServiceArea(): Promise<ServiceArea> {
 }
 async function request<T>(path: string, init: RequestInit = {}, token?: string) {
   const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(init.headers || {}) } });
-  if (!response.ok) throw new Error(`Request failed with status ${response.status}.`);
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { message?: string; errors?: Record<string, string[]> } | null;
+    const validation = body?.errors ? Object.values(body.errors).flat()[0] : undefined;
+    throw new Error(validation || body?.message || `Request failed with status ${response.status}.`);
+  }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }

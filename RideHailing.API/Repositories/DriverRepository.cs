@@ -27,16 +27,31 @@ public class DriverRepository(IConfiguration config) : IDriverRepository
 {
     private NpgsqlConnection Connection() => new(config.GetConnectionString("DefaultConnection"));
 
+    // Every drivers column except current_location. That column is a raw
+    // PostGIS `geography` value — selecting it via `d.*` makes Npgsql try to
+    // materialize a `geography` into the untyped object slot Dapper reads
+    // through, which throws:
+    //   InvalidCastException: Reading as 'System.Object' is not supported
+    //   for fields having DataTypeName 'public.geography'
+    // We only ever need it as lat/lng anyway, so it's pulled separately via
+    // ST_Y/ST_X below (same pattern as TripRepository.LatLngSelectExpr).
+    private const string DriverColumns = @"
+        d.id, d.user_id, d.license_number, d.license_expiry, d.status,
+        d.rating, d.dpi_review_flag, d.strike_count, d.suspended_until,
+        d.total_trips, d.is_documents_verified, d.created_at, d.updated_at,
+        ST_Y(d.current_location::geometry) AS latitude,
+        ST_X(d.current_location::geometry) AS longitude";
+
     public async Task<Driver?> GetByUserIdAsync(Guid userId)
     {
         using var db = Connection();
-        return await db.QuerySingleOrDefaultAsync<Driver>("SELECT d.*, u.full_name, u.phone, u.email FROM drivers d JOIN users u ON u.id = d.user_id WHERE d.user_id = @UserId", new { UserId = userId });
+        return await db.QuerySingleOrDefaultAsync<Driver>($"SELECT {DriverColumns}, u.full_name, u.phone, u.email FROM drivers d JOIN users u ON u.id = d.user_id WHERE d.user_id = @UserId", new { UserId = userId });
     }
 
     public async Task<Driver?> GetByIdAsync(Guid id)
     {
         using var db = Connection();
-        return await db.QuerySingleOrDefaultAsync<Driver>("SELECT d.*, u.full_name, u.phone, u.email FROM drivers d JOIN users u ON u.id = d.user_id WHERE d.id = @Id", new { Id = id });
+        return await db.QuerySingleOrDefaultAsync<Driver>($"SELECT {DriverColumns}, u.full_name, u.phone, u.email FROM drivers d JOIN users u ON u.id = d.user_id WHERE d.id = @Id", new { Id = id });
     }
 
     public async Task<Vehicle?> GetVehicleAsync(Guid driverId)
@@ -71,7 +86,7 @@ public class DriverRepository(IConfiguration config) : IDriverRepository
         var offset = (page - 1) * pageSize;
         var where = status != null ? "WHERE d.status = @Status" : "";
         var total = await db.QuerySingleAsync<int>($"SELECT COUNT(*) FROM drivers d {where}", new { Status = status });
-        var items = await db.QueryAsync<Driver>($"SELECT d.*, u.full_name, u.phone, u.email FROM drivers d JOIN users u ON u.id = d.user_id {where} ORDER BY d.created_at DESC LIMIT @PageSize OFFSET @Offset", new { Status = status, PageSize = pageSize, Offset = offset });
+        var items = await db.QueryAsync<Driver>($"SELECT {DriverColumns}, u.full_name, u.phone, u.email FROM drivers d JOIN users u ON u.id = d.user_id {where} ORDER BY d.created_at DESC LIMIT @PageSize OFFSET @Offset", new { Status = status, PageSize = pageSize, Offset = offset });
         return new PagedResult<Driver> { Items = items.ToList(), TotalCount = total, Page = page, PageSize = pageSize };
     }
 
@@ -246,7 +261,7 @@ public async Task<DriverEarningsResponse> GetEarningsSummaryAsync(Guid driverId)
                     dpi_review_flag, strike_count, suspended_until, total_trips,
                     is_documents_verified, created_at, updated_at,
                     NULL::float8 AS latitude, NULL::float8 AS longitude";
-        return await db.QuerySingleAsync<Driver>(sql, new { UserId = userId, LicenseNumber = licenseNumber, LicenseExpiry = licenseExpiry });
+        return await db.QuerySingleAsync<Driver>(sql, new { UserId = userId, LicenseNumber = licenseNumber, LicenseExpiry = licenseExpiry.ToDateTime(TimeOnly.MinValue) });
     }
 
     public async Task CreateVehicleAsync(Guid driverId, string plateNumber, string make, string model, string color, short year, string vehicleType)
@@ -272,13 +287,13 @@ public async Task<DriverEarningsResponse> GetEarningsSummaryAsync(Guid driverId)
         {
             await db.ExecuteAsync(
                 "UPDATE drivers SET license_number = @LicenseNumber, license_expiry = @LicenseExpiry WHERE id = @DriverId",
-                new { DriverId = driverId.Value, LicenseNumber = licenseNumber, LicenseExpiry = licenseExpiry }, transaction);
+                new { DriverId = driverId.Value, LicenseNumber = licenseNumber, LicenseExpiry = licenseExpiry.ToDateTime(TimeOnly.MinValue) }, transaction);
         }
         else
         {
             driverId = await db.ExecuteScalarAsync<Guid>(
                 "INSERT INTO drivers (user_id, license_number, license_expiry) VALUES (@UserId, @LicenseNumber, @LicenseExpiry) RETURNING id",
-                new { UserId = userId, LicenseNumber = licenseNumber, LicenseExpiry = licenseExpiry }, transaction);
+                new { UserId = userId, LicenseNumber = licenseNumber, LicenseExpiry = licenseExpiry.ToDateTime(TimeOnly.MinValue) }, transaction);
         }
 
         await db.ExecuteAsync(
@@ -291,7 +306,7 @@ public async Task<DriverEarningsResponse> GetEarningsSummaryAsync(Guid driverId)
             new { DriverId = driverId.Value, PlateNumber = plateNumber, Make = make, Model = model, Color = color, Year = year, VehicleType = vehicleType }, transaction);
 
         var result = await db.QuerySingleAsync<Driver>(
-            "SELECT d.*, NULL::float8 AS latitude, NULL::float8 AS longitude FROM drivers d WHERE d.id = @DriverId",
+            $"SELECT {DriverColumns} FROM drivers d WHERE d.id = @DriverId",
             new { DriverId = driverId.Value }, transaction);
         await transaction.CommitAsync();
         return result;

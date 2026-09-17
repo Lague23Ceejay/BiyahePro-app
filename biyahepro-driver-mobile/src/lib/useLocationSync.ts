@@ -11,7 +11,7 @@ import type { DriverSession } from '@/src/types/api';
 
 const PING_INTERVAL_MS = 15000;
 
-export function useLocationSync(session: DriverSession | null) {
+export function useLocationSync(session: DriverSession | null, onError?: (message: string) => void) {
   const tokenRef = useRef(session?.accessToken);
   tokenRef.current = session?.accessToken;
 
@@ -28,8 +28,7 @@ export function useLocationSync(session: DriverSession | null) {
         if (cancelled) return;
         await api.updateLocation(token, position.coords.latitude, position.coords.longitude);
       } catch {
-        // Silently skip a failed ping (permission not yet granted, GPS
-        // momentarily unavailable, etc.) — the next interval tick retries.
+        onError?.('Location access is needed to receive nearby ride requests. Enable location permission for the driver app.');
       }
     }
 
@@ -38,11 +37,11 @@ export function useLocationSync(session: DriverSession | null) {
       if (permission.status !== 'granted' || cancelled) return;
       await pingOnce();
       timer = setInterval(pingOnce, PING_INTERVAL_MS);
-    })();
+    })().catch(() => onError?.('Location access is needed to receive nearby ride requests. Enable location permission for the driver app.'));
 
     return () => {
       cancelled = true;
       if (timer) clearInterval(timer);
     };
-  }, [session?.accessToken]);
+  }, [session?.accessToken, onError]);
 }

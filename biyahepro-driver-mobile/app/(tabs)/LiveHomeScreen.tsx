@@ -5,12 +5,15 @@ import { api } from '@/src/lib/api';
 import { useAuth } from '@/src/context/AuthContext';
 import { colors } from '@/src/theme/colors';
 import { setHubAvailability, useDriverRideEvents } from '@/src/lib/rideHub';
+import { useLocationSync } from '@/src/lib/useLocationSync';
 
 export default function LiveHomeScreen() {
   const { session } = useAuth();
   const [profile, setProfile] = useState<any>(null); const [requests, setRequests] = useState<any[]>([]); const [loading, setLoading] = useState(true); const [available, setAvailable] = useState(false); const [error, setError] = useState('');
+  const locationError = useCallback((message: string) => setError(message), []);
+  useLocationSync(session, locationError);
   async function load() { if (!session?.accessToken) return; try { setLoading(true); const [nextProfile, nextRequests, earnings] = await Promise.all([api.getProfile(session.accessToken), api.getRequests(session.accessToken), api.getEarnings(session.accessToken)]); setProfile({ ...nextProfile, earnings }); setRequests(nextRequests); setAvailable(nextProfile.status === 'available'); setError(''); } catch (e) { setError(e instanceof Error ? e.message : 'Unable to load driver data.'); } finally { setLoading(false); } }
-  useEffect(() => { load(); }, [session?.accessToken]);
+  useEffect(() => { load(); const timer = setInterval(load, 10000); return () => clearInterval(timer); }, [session?.accessToken]);
   const onNewTrip = useCallback((request: any) => { setRequests(current => current.some(item => item.id === request.id) ? current : [{ ...request, requestedAt: request.requestedAt || new Date().toISOString() }, ...current]); }, []);
   const onTripCancelled = useCallback((tripId: string) => { setRequests(current => current.filter(request => request.id !== tripId)); }, []);
   useDriverRideEvents(session?.accessToken, { onNewTrip, onTripCancelled });
