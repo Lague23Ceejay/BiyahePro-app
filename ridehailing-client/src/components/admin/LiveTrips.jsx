@@ -26,6 +26,8 @@ export default function LiveTrips({ onAuthError }) {
 
   useEffect(() => {
     fetchLiveTrips();
+    const timer = window.setInterval(fetchLiveTrips, 10000);
+    return () => window.clearInterval(timer);
   }, []);
 
   return (

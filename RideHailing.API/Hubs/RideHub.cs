@@ -77,8 +77,17 @@ public class RideHub(IDriverRepository driverRepo) : Hub
         await driverRepo.UpdateStatusAsync(driver.Id, newStatus);
 
         if (available)
+        {
             await Groups.AddToGroupAsync(Context.ConnectionId, "available_drivers");
+        }
         else
+        {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, "available_drivers");
+        }
+    }
+
+    public override async Task OnDisconnectedAsync(Exception? exception)
+    {
+        await base.OnDisconnectedAsync(exception);
     }
 }

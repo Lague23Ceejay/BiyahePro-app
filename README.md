@@ -318,3 +318,7 @@ Log in via `POST /api/auth/login` to get an access token, then send it as `Autho
   dotnet clean
   dotnet build
   ```
+
+  plugin addition soon
+
+  npx plugins add vercel/vercel-plugin

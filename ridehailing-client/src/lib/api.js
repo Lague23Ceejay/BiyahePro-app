@@ -8,7 +8,8 @@
 // PIN-gated dashboard did against a real JWT-protected API).
 // ============================================================
 
-export const API_BASE = 'http://localhost:5000';
+const configuredApiUrl = import.meta.env.VITE_API_URL;
+export const API_BASE = (configuredApiUrl || (import.meta.env.DEV ? 'http://localhost:5000' : '')).replace(/\/$/, '');
 
 const TOKEN_KEY = 'biyahepro_admin_token';
 const USER_KEY  = 'biyahepro_admin_user';
@@ -50,6 +51,7 @@ export function clearSession() {
 // a token is stored. Throws a tagged error on 401/403 so callers can
 // react (e.g. force a re-login) instead of silently rendering nothing.
 export async function apiFetch(path, options = {}) {
+  if (!API_BASE) throw new Error('VITE_API_URL is not configured for this deployment.');
   const tokens = getStoredTokens();
   const headers = {
     'Content-Type': 'application/json',
@@ -73,6 +75,7 @@ export async function apiFetch(path, options = {}) {
 
 // ── Login ─────────────────────────────────────────────────────
 export async function login(email, password) {
+  if (!API_BASE) throw new Error('VITE_API_URL is not configured for this deployment.');
   const response = await fetch(`${API_BASE}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

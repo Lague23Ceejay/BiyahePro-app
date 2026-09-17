@@ -75,6 +75,7 @@ builder.Services.AddSignalR(options =>
 {
     options.EnableDetailedErrors = builder.Environment.IsDevelopment();
     options.KeepAliveInterval   = TimeSpan.FromSeconds(15);
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(60);
 });
 
 // ── CORS ──────────────────────────────────────────────────────

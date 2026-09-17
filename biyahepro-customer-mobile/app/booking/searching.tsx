@@ -13,6 +13,8 @@ export default function SearchingForDriverScreen() {
   const { tripId } = useLocalSearchParams<{ tripId?: string }>();
   const { status: pushedStatus, connectionState } = useTripUpdates(tripId, session?.accessToken, 'requested');
   const [seedStatus, setSeedStatus] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [error, setError] = useState('');
   const navigatedRef = useRef(false);
 
   // One-time catch-up: covers a status change that happened in the gap
@@ -46,6 +48,20 @@ export default function SearchingForDriverScreen() {
   const currentStatus = status ?? 'requested';
   const assigned = LIVE_STATUSES.includes(currentStatus);
 
+  async function cancelBooking() {
+    if (!session?.accessToken || !tripId) return;
+    setCancelling(true);
+    setError('');
+    try {
+      await api.cancelTrip(tripId, 'Customer cancelled the booking.', session.accessToken);
+      router.replace('/(tabs)/bookings');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to cancel this booking.');
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   return (
     <View style={styles.page}>
       <View style={styles.circle}><ActivityIndicator size="large" color={colors.brand} /></View>
@@ -68,8 +84,10 @@ export default function SearchingForDriverScreen() {
 
       <View style={styles.actions}>
         <Pressable style={styles.secondaryButton} onPress={() => router.replace('/(tabs)/bookings')}><Text style={styles.secondaryText}>View my bookings</Text></Pressable>
+        <Pressable style={styles.cancelButton} onPress={cancelBooking} disabled={cancelling}><Text style={styles.cancelText}>{cancelling ? 'Cancelling...' : 'Cancel booking'}</Text></Pressable>
         <Pressable style={styles.linkButton} onPress={() => router.replace('/(tabs)')}><Text style={styles.linkText}>Back to home</Text></Pressable>
       </View>
+      {!!error && <Text style={styles.error}>{error}</Text>}
     </View>
   );
 }
@@ -90,4 +108,7 @@ const styles = StyleSheet.create({
   secondaryText: { color: '#fff', fontWeight: '900' },
   linkButton: { paddingVertical: 10, alignItems: 'center' },
   linkText: { color: colors.brandDark, fontWeight: '800' },
+  cancelButton: { paddingVertical: 10, alignItems: 'center' },
+  cancelText: { color: colors.danger, fontWeight: '800' },
+  error: { color: colors.danger, textAlign: 'center', marginTop: 12 },
 });

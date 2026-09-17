@@ -111,6 +111,13 @@ export const api = {
     return request<PagedResult<Trip>>(`/api/trips/history?page=${page}&pageSize=${pageSize}`, {}, token);
   },
 
+  cancelTrip(tripId: string, reason: string, token: string) {
+    return request<Trip>(`/api/trips/${tripId}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }, token);
+  },
+
   rateTrip(tripId: string, payload: RateTripPayload, token: string) {
     return request<{ message: string }>(`/api/trips/${tripId}/rate`, {
       method: 'POST',

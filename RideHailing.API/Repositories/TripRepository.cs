@@ -25,14 +25,14 @@ public class TripRepository(IConfiguration config) : ITripRepository
 {
     using var db = Connection();
     var sql = $@"
-        SELECT {TripColumns}, {LatLngSelectExpr},
+        SELECT t.id, t.pickup_address, t.dropoff_address, t.fare_amount,
+            t.requested_at,
             uc.full_name AS customer_name,
             ROUND((ST_Distance(t.pickup_location, ST_SetSRID(ST_MakePoint(@Lng, @Lat), 4326)::geography) / 1000)::numeric, 2) AS distance_km
         FROM trips t
         JOIN users uc ON uc.id = t.customer_id
-        WHERE t.status = 'requested'
-          AND t.vehicle_type = @VehicleType
-          AND ST_DWithin(t.pickup_location, ST_SetSRID(ST_MakePoint(@Lng, @Lat), 4326)::geography, @RadiusMeters)
+                WHERE t.status = 'requested'
+                    AND t.vehicle_type = @VehicleType
         ORDER BY distance_km ASC
         LIMIT 20";
     var result = await db.QueryAsync<PendingTripResponse>(sql, new
@@ -143,7 +143,12 @@ public class TripRepository(IConfiguration config) : ITripRepository
     {
         using var db = Connection();
         var offset = (page - 1) * pageSize;
-        var ownership = role == "driver" ? "d.user_id = @UserId" : "t.customer_id = @UserId";
+        var ownership = role switch
+        {
+            "driver" => "d.user_id = @UserId",
+            "admin" => "TRUE",
+            _ => "t.customer_id = @UserId"
+        };
         var total = await db.QuerySingleAsync<int>($@"
             SELECT COUNT(*)
             FROM trips t

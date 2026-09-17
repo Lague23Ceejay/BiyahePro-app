@@ -191,8 +191,8 @@ public async Task<DriverEarningsResponse> GetEarningsSummaryAsync(Guid driverId)
 
     var completion = await db.QuerySingleAsync<(int Completed, int Total)>(
         @"SELECT
-            COUNT(*)::int FILTER (WHERE status = 'completed') AS completed,
-            COUNT(*)::int FILTER (WHERE status IN ('completed', 'cancelled')) AS total
+            (COUNT(*) FILTER (WHERE status = 'completed'))::int AS completed,
+            (COUNT(*) FILTER (WHERE status IN ('completed', 'cancelled')))::int AS total
           FROM trips WHERE driver_id = @DriverId",
         new { DriverId = driverId });
     var completionRate = completion.Total > 0 ? (int)Math.Round(100.0 * completion.Completed / completion.Total) : 100;

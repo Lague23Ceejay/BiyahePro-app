@@ -49,9 +49,9 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       # Overrides appsettings.json's "Host=localhost" — inside the compose
       # network the DB is reachable at the service name "db", not localhost.
-      # Values come from the same .env used by the db service above, so the
-      # app-role credentials always match what 00_role.sh actually created.
-      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=${POSTGRES_DB};Username=${APP_DB_USER};Password=${APP_DB_PASSWORD}
+      # Use Supabase when configured; otherwise keep the local Docker database
+      # as the development fallback.
+      ConnectionStrings__DefaultConnection: ${SUPABASE_CONNECTION_STRING:-Host=db;Port=5432;Database=${POSTGRES_DB};Username=${APP_DB_USER};Password=${APP_DB_PASSWORD}}
 
     ports:
       # Host 5000 matches what the mobile app's API_BASE_URL already assumes.

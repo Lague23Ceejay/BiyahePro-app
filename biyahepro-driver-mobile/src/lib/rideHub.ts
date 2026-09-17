@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as signalR from '@microsoft/signalr';
 import { API_BASE_URL } from '@/src/lib/api';
+import { loadSession } from '@/src/lib/session';
 
 export type NewTripRequest = {
   id: string;
@@ -25,7 +26,10 @@ function getConnection(token: string) {
   connection?.stop();
   connectionToken = token;
   connection = new signalR.HubConnectionBuilder()
-    .withUrl(`${API_BASE_URL}/hubs/ride`, { accessTokenFactory: () => token })
+    .withUrl(`${API_BASE_URL}/hubs/ride`, { accessTokenFactory: async () => (await loadSession())?.accessToken || token })
+    .configureLogging(signalR.LogLevel.Warning)
+    .withKeepAliveInterval(10000)
+    .withServerTimeout(60000)
     .withAutomaticReconnect()
     .build();
   return connection;

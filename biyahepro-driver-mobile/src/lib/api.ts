@@ -23,6 +23,11 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string) 
   return response.json() as Promise<T>;
 }
 export const api = {
+  async refresh(refreshToken: string) {
+    const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(refreshToken) });
+    if (!response.ok) throw new Error('Driver session expired. Please sign in again.');
+    return response.json() as Promise<LoginResponse>;
+  },
   async login(email: string, password: string) {
     const response = await fetch(`${API_BASE_URL}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
     if (!response.ok) throw new Error('Unable to sign in with those details.');
