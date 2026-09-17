@@ -82,7 +82,11 @@ builder.Services.AddSignalR(options =>
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(
+                  "https://biyahe-pro-app.vercel.app",
+                  "http://localhost:5173",
+                  "http://127.0.0.1:5173"
+              )
               .AllowAnyMethod()
               .AllowAnyHeader());
 });
@@ -115,6 +119,7 @@ app.UseAuthentication();    // 1. Validate JWT
 app.UseAuthorization();     // 2. Check roles/policies
 app.UseAuditLogging();      // 3. Log admin writes AFTER auth so we know who the user is
 
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.MapControllers();
 app.MapHub<RideHub>("/hubs/ride");
 
