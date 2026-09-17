@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: biyahepro-api
+    runtime: docker
+    rootDir: RideHailing.API
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+      - key: Jwt__Secret
+        sync: false
