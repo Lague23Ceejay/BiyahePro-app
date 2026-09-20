@@ -12,5 +12,6 @@ module.exports = {
     web: { bundler: 'metro', output: 'single' },
     plugins: ['expo-router', 'expo-secure-store', ['react-native-maps', { androidGoogleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY }]],
     experiments: { typedRoutes: true },
+    extra: { eas: { projectId: '637f23ab-c183-42de-8103-27f2cb91b697' } },
   },
 };
