@@ -128,6 +128,117 @@ BiyahePro - new/                                    ← Root Workspace Directory
 
 ---
 
+## Docker Compose Local Development
+
+The root `docker-compose.yml` runs the local BiyahePro stack as five services:
+
+| Service | Purpose | Host address | Internal address |
+| --- | --- | --- | --- |
+| `db` | PostgreSQL 18 with PostGIS | `localhost:5432` | `db:5432` |
+| `api` | ASP.NET Core Web API and SignalR hub | `http://localhost:5000` | `http://api:8080` |
+| `admin` | Vite admin dashboard | `http://localhost:5173` | `http://admin:5173` |
+| `mobile` | Customer Expo/Metro server | `localhost:8081` | `mobile:8081` |
+| `driver-mobile` | Driver Expo/Metro server | `localhost:8082` | `driver-mobile:8082` |
+
+The API is the central application service. The admin client and both mobile apps call its HTTP endpoints and SignalR hub. The API connects to PostgreSQL using the Compose service name `db`, not `localhost`:
+
+```text
+Admin browser ───────────────┐
+Customer/driver phone ──────┼──> API :5000 ───> PostgreSQL/PostGIS :5432
+                             │
+Expo Go / Metro dev server ─┘
+```
+
+### Prerequisites
+
+- Docker Desktop with Docker Compose enabled
+- A root `.env` file containing the database credentials and your computer's LAN IP
+- A phone and development computer on the same network when using a physical device
+
+Example root `.env`:
+
+```env
+POSTGRES_DB=ridehailing
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=change-this-local-password
+APP_DB_USER=ridehailing_app
+APP_DB_PASSWORD=change-this-app-password
+HOST_LAN_IP=192.168.1.20
+```
+
+`HOST_LAN_IP` must be the address of the development computer on the local network. On Windows, find it with `ipconfig`. Do not use `localhost` for a physical phone because, on the phone, `localhost` means the phone itself.
+
+### Start the complete local stack
+
+Run these commands from the repository root:
+
+```powershell
+docker compose up --build
+```
+
+Then open:
+
+- Admin dashboard: `http://localhost:5173`
+- API: `http://localhost:5000`
+- API health check: `http://localhost:5000/health`
+- Customer Expo server: port `8081`
+- Driver Expo server: port `8082`
+
+The API waits for the database health check before starting. The database initialization scripts in `ridehailing-db/` run automatically only when PostgreSQL initializes a new data directory. The scripts are mounted at `/docker-entrypoint-initdb.d` inside the database container and are executed in filename order.
+
+### How source code and data are mounted
+
+- The API source is copied into its image and published as a .NET release build.
+- The admin and mobile source folders are bind-mounted from the host, so edits are picked up by Vite or Expo without rebuilding the image.
+- `/app/node_modules` is an anonymous volume for the JavaScript containers. This prevents the host's `node_modules` from replacing the Linux dependencies installed in Docker.
+- PostgreSQL data is stored in the named volume `ridehailing-postgres-data`, so restarting containers does not delete the database.
+
+Useful lifecycle commands:
+
+```powershell
+# Stop containers and keep database data
+docker compose down
+
+# Rebuild images after changing a Dockerfile or package manifest
+docker compose up --build
+
+# Follow one service's logs
+docker compose logs -f api
+
+# Stop containers and delete the database volume (destructive)
+docker compose down -v
+```
+
+### Client API URLs
+
+The browser admin client uses `http://localhost:5000` in Vite development unless `VITE_API_URL` overrides it. A physical customer or driver phone must use:
+
+```env
+EXPO_PUBLIC_API_URL=http://YOUR-PC-LAN-IP:5000
+```
+
+Set this in `biyahepro-customer-mobile/.env` for the customer app. The driver container receives the equivalent URL from `HOST_LAN_IP` in Compose. Android emulators use `http://10.0.2.2:5000` when no explicit API URL is configured; iOS simulators use `http://localhost:5000`.
+
+The API's database connection is different from the client URL. It is resolved inside the Compose network as:
+
+```text
+Host=db;Port=5432;Database=POSTGRES_DB;Username=APP_DB_USER;Password=APP_DB_PASSWORD
+```
+
+If `SUPABASE_CONNECTION_STRING` is supplied, Compose uses that connection string instead of the local `db` service.
+
+### Troubleshooting Docker startup
+
+- **API cannot connect to PostgreSQL:** check the `db` health status and verify `POSTGRES_*` and `APP_DB_*` values. The API must use `Host=db`, not `Host=localhost`.
+- **Phone cannot reach the API:** verify `HOST_LAN_IP`, that the phone and computer share a network, and that Windows Firewall allows port `5000`.
+- **Expo QR code points to an unreachable address:** set `HOST_LAN_IP` to the computer's actual Wi-Fi/LAN IPv4 address and restart the mobile service.
+- **Database changes do not appear:** existing data volumes do not rerun initialization scripts. Apply the SQL change manually, or remove the local volume with `docker compose down -v` when it is safe to recreate the database.
+- **Frontend changes do not appear:** confirm the service is running with its bind mount and that polling is enabled. The Compose file sets `CHOKIDAR_USEPOLLING=true` for the Vite and Expo services.
+
+The Dockerfiles are intended for local development for the admin and mobile clients. The API Dockerfile supports both Compose and deployment platforms such as Render by resolving the runtime `PORT` environment variable when the container starts. `render.yaml` currently configures the API deployment separately; it does not deploy the entire local Compose stack.
+
+---
+
 ## 📱 Customer Mobile App (Expo)
 
 `biyahepro-customer-mobile` is the customer-facing mobile application. It supports:
