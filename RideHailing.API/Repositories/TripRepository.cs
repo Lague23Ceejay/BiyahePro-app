@@ -10,6 +10,7 @@ public interface ITripRepository
 {
     Task<Trip> CreateAsync(Trip trip);
     Task<Trip?> GetByIdAsync(Guid id);
+    Task<bool> TryAcceptAsync(Guid tripId, Guid driverId, DateTime acceptedAt);
     Task UpdateAsync(Trip trip);
     Task<PagedResult<Trip>> GetHistoryAsync(Guid userId, string role, int page, int pageSize);
     Task<List<Trip>> GetDueScheduledTripsAsync();
@@ -110,6 +111,17 @@ public class TripRepository(IConfiguration config) : ITripRepository
         using var db = Connection();
         var sql = $"SELECT {TripColumns}, {LatLngSelectExpr} FROM trips t WHERE t.id = @Id";
         return await db.QuerySingleOrDefaultAsync<Trip>(sql, new { Id = id });
+    }
+
+    public async Task<bool> TryAcceptAsync(Guid tripId, Guid driverId, DateTime acceptedAt)
+    {
+        using var db = Connection();
+        var rows = await db.ExecuteAsync(@"
+            UPDATE trips
+            SET driver_id = @DriverId, status = 'accepted', accepted_at = @AcceptedAt
+            WHERE id = @TripId AND status = 'requested'",
+            new { TripId = tripId, DriverId = driverId, AcceptedAt = acceptedAt });
+        return rows == 1;
     }
 
     public async Task UpdateAsync(Trip trip)

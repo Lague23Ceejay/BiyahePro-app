@@ -1,5 +1,5 @@
 // File path in project: ridehailing-client/src/components/admin/DriversPanel.jsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { RefreshCw, AlertTriangle, ShieldOff, ShieldCheck, History } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
 import StatusBadge from '../ui/StatusBadge';
@@ -9,6 +9,7 @@ export default function DriversPanel({ onAuthError }) {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [dpiOnly, setDpiOnly] = useState(false);
+  const activeDriversRequest = useRef(null);
 
   // Per-row UI state: which row has the strike form open, its reason text,
   // whether an action is in flight, and any expanded strike history.
@@ -19,26 +20,39 @@ export default function DriversPanel({ onAuthError }) {
   const [strikeHistoryFor, setStrikeHistoryFor] = useState(null);
   const [strikeHistory, setStrikeHistory] = useState([]);
 
-  async function fetchDrivers() {
+  const fetchDrivers = useCallback(async () => {
+    activeDriversRequest.current?.abort();
+    const controller = new AbortController();
+    activeDriversRequest.current = controller;
+
     try {
-      setLoading(true);
       const query = statusFilter ? `?status=${statusFilter}&pageSize=50` : '?pageSize=50';
-      const response = await apiFetch(`/api/drivers${query}`);
+      const response = await apiFetch(`/api/drivers${query}`, { signal: controller.signal });
       if (response.ok) {
         const data = await response.json();
-        setDrivers(data.items || []);
+        if (!controller.signal.aborted && activeDriversRequest.current === controller)
+          setDrivers(data.items || []);
       }
     } catch (error) {
+      if (error.name === 'AbortError') return;
+      if (controller.signal.aborted || activeDriversRequest.current !== controller) return;
       if (error.isAuthError) { onAuthError?.(); return; }
       console.error('Failed to fetch drivers:', error);
     } finally {
-      setLoading(false);
+      if (activeDriversRequest.current === controller) {
+        activeDriversRequest.current = null;
+        if (!controller.signal.aborted) setLoading(false);
+      }
     }
-  }
+  }, [statusFilter, onAuthError]);
 
   useEffect(() => {
-    fetchDrivers();
-  }, [statusFilter]);
+    const timer = window.setTimeout(fetchDrivers, 0);
+    return () => {
+      window.clearTimeout(timer);
+      activeDriversRequest.current?.abort();
+    };
+  }, [fetchDrivers]);
 
   const visibleDrivers = dpiOnly ? drivers.filter(d => d.dpiReviewFlag) : drivers;
 
@@ -113,7 +127,7 @@ export default function DriversPanel({ onAuthError }) {
         </div>
         <button
           type="button"
-          onClick={fetchDrivers}
+          onClick={() => { setLoading(true); fetchDrivers(); }}
           className="flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-amber-500 transition"
         >
           <RefreshCw className="w-3.5 h-3.5" /> Refresh
@@ -123,7 +137,7 @@ export default function DriversPanel({ onAuthError }) {
       <div className="flex items-center gap-4 mb-4">
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => { setLoading(true); setStatusFilter(e.target.value); }}
           className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs focus:border-amber-500 focus:outline-none transition"
         >
           <option value="">All statuses</option>

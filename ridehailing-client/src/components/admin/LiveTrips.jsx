@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { RefreshCw, MapPin } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
 import StatusBadge from '../ui/StatusBadge';
@@ -6,29 +6,44 @@ import StatusBadge from '../ui/StatusBadge';
 export default function LiveTrips({ onAuthError }) {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  async function fetchLiveTrips() {
-    try {
-      setLoading(true);
-      // Fetches standard history logs from your backend controller
-      const response = await apiFetch('/api/trips/history?page=1&pageSize=50');
-      if (response.ok) {
-        const data = await response.json();
-        setTrips(data.items || []);
-      }
-    } catch (error) {
-      if (error.isAuthError) { onAuthError?.(); return; }
-      console.error("Failed to fetch live system trips:", error);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
+    let activeController = null;
+
+    async function fetchLiveTrips() {
+      activeController?.abort();
+      const controller = new AbortController();
+      activeController = controller;
+
+      try {
+        setLoading(true);
+        // Fetches standard history logs from your backend controller
+        const response = await apiFetch('/api/trips/history?page=1&pageSize=50', {
+          signal: controller.signal,
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (!controller.signal.aborted && activeController === controller)
+            setTrips(data.items || []);
+        }
+      } catch (error) {
+        if (error.name === 'AbortError') return;
+        if (error.isAuthError) { onAuthError?.(); return; }
+        console.error('Failed to fetch live system trips:', error);
+      } finally {
+        if (!controller.signal.aborted && activeController === controller)
+          setLoading(false);
+      }
+    }
+
     fetchLiveTrips();
     const timer = window.setInterval(fetchLiveTrips, 10000);
-    return () => window.clearInterval(timer);
-  }, []);
+    return () => {
+      window.clearInterval(timer);
+      activeController?.abort();
+    };
+  }, [refreshKey, onAuthError]);
 
   return (
     <div className="space-y-4">
@@ -38,7 +53,7 @@ export default function LiveTrips({ onAuthError }) {
           <p className="text-slate-400 text-sm mt-0.5">Monitor active bookings flowing through the ecosystem</p>
         </div>
         <button
-          onClick={fetchLiveTrips}
+          onClick={() => setRefreshKey((key) => key + 1)}
           className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 px-4 py-2 rounded-xl text-sm font-medium transition"
         >
           <RefreshCw className="w-4 h-4" /> Refresh Logs

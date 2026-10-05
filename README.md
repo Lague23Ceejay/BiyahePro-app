@@ -35,8 +35,6 @@ The complete BiyahePro stack, from client applications to infrastructure:
 
 ## 🛠️ Global Project Architecture Map
 
-Ensure your folder tree layout side-by-side matches this complete schematic inside your root workspace:
-
 ```text
 BiyahePro - new/                                    ← Root Workspace Directory
 ├── README.md                                      ← This file!

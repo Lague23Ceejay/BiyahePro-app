@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -50,6 +51,7 @@ export default function NewBookingScreen() {
   const [center, setCenter] = useState<{ latitude: number; longitude: number }>(DEFAULT_PICKUP);
   const [locationLoading, setLocationLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
+  const [isMapExpanded, setIsMapExpanded] = useState(false);
   const [estimate, setEstimate] = useState<FareEstimate | null>(null);
   const [loading, setLoading] = useState(false);
   const [booking, setBooking] = useState(false);
@@ -264,6 +266,44 @@ export default function NewBookingScreen() {
     }
   }
 
+  // Shared between the inline map card and the fullscreen Modal so the
+  // marker/tap/location logic only has to live in one place. `expanded`
+  // only changes the expand/collapse button shown in the top-right corner.
+  function renderMapContent(expanded: boolean) {
+    return (
+      <>
+        <LeafletMapPicker
+          key={serviceArea ? `${serviceArea.latitude}-${serviceArea.longitude}-${serviceArea.radiusKm}` : 'default-service-area'}
+          ref={mapRef}
+          initialCenter={center}
+          initialZoom={15}
+          pickup={pickup}
+          dropoff={dropoff}
+          onMapPress={(point) => selectPoint(point.latitude, point.longitude)}
+          onReady={() => setMapReady(true)}
+          serviceArea={serviceArea}
+        />
+        <View style={styles.mapOverlay} pointerEvents="none">
+          <Text style={styles.mapHint}>Tap anywhere to place the {target === 'pickup' ? 'pickup' : 'destination'} pin.</Text>
+        </View>
+        <View style={styles.mapActions}>
+          <Pressable style={[styles.locationButton, locationLoading && styles.disabled]} onPress={loadCurrentLocation} disabled={locationLoading}>
+            {locationLoading ? <ActivityIndicator size="small" color={colors.brand} /> : <Text style={styles.locationIcon}>⌖</Text>}
+            <Text style={styles.locationButtonText}>Use my location</Text>
+          </Pressable>
+        </View>
+        <Pressable
+          style={styles.expandButton}
+          onPress={() => setIsMapExpanded(!expanded)}
+          hitSlop={10}
+        >
+          <Text style={styles.expandIcon}>{expanded ? '⤬' : '⛶'}</Text>
+        </Pressable>
+        {!mapReady && <View style={styles.mapLoading}><ActivityIndicator color={colors.brand} /><Text style={styles.mapLoadingText}>Loading map…</Text></View>}
+      </>
+    );
+  }
+
   return (
     <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
@@ -277,34 +317,30 @@ export default function NewBookingScreen() {
           <Text style={styles.subtitle}>Set your pickup and destination on the map.</Text>
         </View>
 
-        <View
-          style={styles.mapCard}
-          onTouchStart={() => setScrollEnabled(false)}
-          onTouchEnd={() => setScrollEnabled(true)}
-          onTouchCancel={() => setScrollEnabled(true)}
+        {!isMapExpanded && (
+          <View
+            style={styles.mapCard}
+            onTouchStart={() => setScrollEnabled(false)}
+            onTouchEnd={() => setScrollEnabled(true)}
+            onTouchCancel={() => setScrollEnabled(true)}
+          >
+            {renderMapContent(false)}
+          </View>
+        )}
+
+        {/* Fullscreen mode — same map content, rendered inside a Modal instead
+            of the fixed-height card. Only one of the two is ever mounted at
+            once, so there's no duplicate WebView instance or ref collision;
+            switching back just re-mounts the inline card version. */}
+        <Modal
+          visible={isMapExpanded}
+          animationType="slide"
+          onRequestClose={() => setIsMapExpanded(false)}
         >
-          <LeafletMapPicker
-            key={serviceArea ? `${serviceArea.latitude}-${serviceArea.longitude}-${serviceArea.radiusKm}` : 'default-service-area'}
-            ref={mapRef}
-            initialCenter={center}
-            initialZoom={15}
-            pickup={pickup}
-            dropoff={dropoff}
-            onMapPress={(point) => selectPoint(point.latitude, point.longitude)}
-            onReady={() => setMapReady(true)}
-            serviceArea={serviceArea}
-          />
-          <View style={styles.mapOverlay} pointerEvents="none">
-            <Text style={styles.mapHint}>Tap anywhere to place the {target === 'pickup' ? 'pickup' : 'destination'} pin.</Text>
+          <View style={styles.fullscreenMapCard}>
+            {renderMapContent(true)}
           </View>
-          <View style={styles.mapActions}>
-            <Pressable style={[styles.locationButton, locationLoading && styles.disabled]} onPress={loadCurrentLocation} disabled={locationLoading}>
-              {locationLoading ? <ActivityIndicator size="small" color={colors.brand} /> : <Text style={styles.locationIcon}>⌖</Text>}
-              <Text style={styles.locationButtonText}>Use my location</Text>
-            </Pressable>
-          </View>
-          {!mapReady && <View style={styles.mapLoading}><ActivityIndicator color={colors.brand} /><Text style={styles.mapLoadingText}>Loading map…</Text></View>}
-        </View>
+        </Modal>
 
         <View style={styles.selectorRow}>
           <Pressable style={[styles.selector, target === 'pickup' && styles.selectorActive]} onPress={() => { setTarget('pickup'); focusPoint(pickup); }}>
@@ -424,6 +460,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '900', color: colors.text },
   subtitle: { marginTop: 3, color: colors.muted },
   mapCard: { height: 330, borderRadius: 22, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, position: 'relative' },
+  fullscreenMapCard: { flex: 1, backgroundColor: colors.surface, position: 'relative' },
+  expandButton: {
+    position: 'absolute', top: 14, right: 14, width: 38, height: 38, borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center',
+  },
+  expandIcon: { color: '#fff', fontSize: 18 },
   map: { ...StyleSheet.absoluteFill },
   mapOverlay: { position: 'absolute', top: 12, left: 12, right: 12, alignItems: 'center' },
   mapHint: { backgroundColor: 'rgba(255,255,255,0.94)', color: colors.text, fontSize: 12, fontWeight: '700', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16, overflow: 'hidden' },

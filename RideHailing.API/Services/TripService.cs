@@ -151,11 +151,12 @@ public class TripService(
         var vehicle = await driverRepo.GetVehicleAsync(driver.Id);
         if (vehicle == null || vehicle.VehicleType != trip.VehicleType) return null;
 
-        trip.DriverId   = driver.Id;
-        trip.Status     = "accepted";
-        trip.AcceptedAt = DateTime.UtcNow;
+        var acceptedAt = DateTime.UtcNow;
+        if (!await tripRepo.TryAcceptAsync(tripId, driver.Id, acceptedAt)) return null;
 
-        await tripRepo.UpdateAsync(trip);
+        trip = await tripRepo.GetByIdAsync(tripId);
+        if (trip == null) return null;
+
         await driverRepo.UpdateStatusAsync(driver.Id, "on_trip");
 
         await hub.Clients.Group($"user_{trip.CustomerId}").SendAsync("TripAccepted", new

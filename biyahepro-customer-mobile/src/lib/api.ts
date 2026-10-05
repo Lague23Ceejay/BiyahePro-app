@@ -93,6 +93,18 @@ export const api = {
     });
   },
 
+  // Public refresh, for AuthContext's refresh-on-launch — distinct from the
+  // private refreshAccessToken() above, which is only for the request()
+  // wrapper's own automatic retry-after-401. retryOnUnauthorized is false
+  // here too, same reason: a 401 on the refresh call itself means the
+  // refresh token is dead, not that it needs another refresh attempt.
+  refresh(refreshToken: string) {
+    return request<AuthResponse>('/api/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify(refreshToken),
+    }, undefined, false);
+  },
+
   estimateFare(payload: FareEstimateRequest) {
     return request<FareEstimate>('/api/trips/estimate', {
       method: 'POST',
