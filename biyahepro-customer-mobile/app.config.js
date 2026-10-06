@@ -9,7 +9,7 @@ module.exports = {
     userInterfaceStyle: 'automatic',
     newArchEnabled: true,
     
-    // 🛡️ FIXED FOR EAS UPDATES
+    // 🔴 ADDED FOR EAS UPDATES
     updates: {
       url: "https://expo.dev"
     },

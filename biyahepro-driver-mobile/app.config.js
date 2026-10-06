@@ -7,6 +7,15 @@ module.exports = {
     scheme: 'biyahepro-driver',
     userInterfaceStyle: 'light',
     newArchEnabled: true,
+    
+    // 🛡️ FIXED FOR DRIVER EAS UPDATES
+    updates: {
+      url: "https://expo.dev"
+    },
+    runtimeVersion: {
+      policy: "appVersion"
+    },
+
     ios: { supportsTablet: true, bundleIdentifier: 'com.biyahepro.driver', config: { googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY } },
     android: { package: 'com.biyahepro.driver', adaptiveIcon: { backgroundColor: '#F4F7F5' }, edgeToEdgeEnabled: true, config: { googleMaps: { apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY } } },
     web: { bundler: 'metro', output: 'single' },
