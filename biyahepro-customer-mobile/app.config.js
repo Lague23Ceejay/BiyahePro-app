@@ -8,6 +8,15 @@ module.exports = {
     scheme: 'biyahepro',
     userInterfaceStyle: 'automatic',
     newArchEnabled: true,
+    
+    // 🛡️ FIXED FOR EAS UPDATES
+    updates: {
+      url: "https://expo.dev"
+    },
+    runtimeVersion: {
+      policy: "appVersion"
+    },
+
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.biyahepro.customer',
