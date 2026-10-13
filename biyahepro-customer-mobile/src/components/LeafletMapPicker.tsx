@@ -50,7 +50,7 @@ type Props = {
 // Self-contained HTML string — no bundling step needed, the WebView loads
 // this directly. Leaflet's JS/CSS come from unpkg's CDN.
 function buildHtml({ latitude, longitude }: LatLng, zoom: number, serviceArea?: Props['serviceArea']) {
-  const circle = serviceArea ? `L.circle([${serviceArea.latitude}, ${serviceArea.longitude}], { radius: ${serviceArea.radiusKm * 1000}, color: '#FF6412', fillColor: '#FF6412', fillOpacity: 0.08 }).addTo(map);` : '';
+  const circle = serviceArea ? `var serviceAreaCircle = L.circle([${serviceArea.latitude}, ${serviceArea.longitude}], { radius: ${serviceArea.radiusKm * 1000}, color: '#FF6412', fillColor: '#FF6412', fillOpacity: 0.12 }).addTo(map); map.fitBounds(serviceAreaCircle.getBounds(), { padding: [24, 24] });` : '';
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -94,6 +94,11 @@ function buildHtml({ latitude, longitude }: LatLng, zoom: number, serviceArea?: 
     map.on('click', function (e) {
       post({ type: 'press', latitude: e.latlng.lat, longitude: e.latlng.lng });
     });
+
+    function resizeMap() { map.invalidateSize(); }
+    setTimeout(resizeMap, 100);
+    setTimeout(resizeMap, 400);
+    window.addEventListener('resize', resizeMap);
 
     // Handles commands sent from the RN side (update markers, recenter).
     // Registered on both 'message' and 'document' events — Android fires

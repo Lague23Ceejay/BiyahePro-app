@@ -12,7 +12,7 @@ export function MapPreview({ compact = false }: { compact?: boolean }) {
   function renderContent(expanded: boolean) {
     return (
       <>
-        <LeafletDriverMap compact={compact && !expanded} />
+        <LeafletDriverMap compact={compact && !expanded} expanded={expanded} />
         <View style={styles.badge}><Text style={styles.badgeText}>Maps</Text></View>
         <View style={styles.status}>
           <View style={styles.dot} />

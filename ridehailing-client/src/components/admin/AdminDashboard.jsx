@@ -14,6 +14,8 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState({});
   const [saveError, setSaveError] = useState('');
+  const [serviceAreaSaving, setServiceAreaSaving] = useState(false);
+  const [serviceAreaMessage, setServiceAreaMessage] = useState('');
 
   useEffect(() => {
     if (activeTab !== 'general' && activeTab !== 'fares') return;
@@ -63,6 +65,26 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
 
   const handleSettingChange = (key, value) => {
     setSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleSaveServiceArea = async () => {
+    setServiceAreaSaving(true);
+    setServiceAreaMessage('');
+    try {
+      for (const key of ['service_area.latitude', 'service_area.longitude', 'service_area.radius_km']) {
+        const response = await apiFetch(`/api/settings/${key}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ value: settings[key] }),
+        });
+        if (!response.ok) throw new Error(`Unable to save ${key}.`);
+      }
+      setServiceAreaMessage('Service area saved and published to customer and driver maps.');
+    } catch (error) {
+      if (error.isAuthError) { onAuthError(); return; }
+      setServiceAreaMessage(error instanceof Error ? error.message : 'Unable to save the service area.');
+    } finally {
+      setServiceAreaSaving(false);
+    }
   };
 
   const serviceArea = {
@@ -161,7 +183,39 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
         {activeTab === 'analytics' && <OverviewPanel onAuthError={onAuthError} />}
         {activeTab === 'drivers' && <DriversPanel onAuthError={onAuthError} />}
         {activeTab === 'audit' && <AuditLogs onAuthError={onAuthError} />}
-        {(activeTab === 'general' || activeTab === 'fares') && <div className="mb-6 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden"><div className="p-4 border-b border-slate-800"><h2 className="font-bold">Service Area</h2><p className="text-xs text-slate-500 mt-1">Only admins can move this circle. Press Commit Parameters Change to publish it to customer and driver maps.</p></div><LeafletMap center={serviceArea} radiusKm={Number(settings['service_area.radius_km'] || 5)} onMove={(point) => { handleSettingChange('service_area.latitude', point.lat.toFixed(6)); handleSettingChange('service_area.longitude', point.lng.toFixed(6)); }} /></div>}
+        {(activeTab === 'general' || activeTab === 'fares') && (
+          <div className="mb-6 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+            <div className="p-4 border-b border-slate-800">
+              <h2 className="font-bold">Service Area</h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Drag the orange marker or tap the map to choose the service-area center. Save the change to publish the circle to customer and driver maps.
+              </p>
+            </div>
+            <LeafletMap
+              center={serviceArea}
+              radiusKm={Number(settings['service_area.radius_km'] || 5)}
+              onMove={(point) => {
+                handleSettingChange('service_area.latitude', point.lat.toFixed(6));
+                handleSettingChange('service_area.longitude', point.lng.toFixed(6));
+                setServiceAreaMessage('Unsaved service-area location.');
+              }}
+            />
+            <div className="flex flex-wrap items-center gap-3 p-4">
+              <button
+                type="button"
+                onClick={handleSaveServiceArea}
+                disabled={serviceAreaSaving || loading}
+                className="bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-slate-950 font-bold px-5 py-2.5 rounded-xl transition text-sm"
+              >
+                {serviceAreaSaving ? 'Saving service area…' : 'Save service area'}
+              </button>
+              {serviceAreaMessage && <p role="status" className="text-sm text-slate-300">{serviceAreaMessage}</p>}
+              <p className="w-full text-xs text-slate-500">
+                Center: {serviceArea.lat.toFixed(6)}, {serviceArea.lng.toFixed(6)} · Radius: {Number(settings['service_area.radius_km'] || 5)} km
+              </p>
+            </div>
+          </div>
+        )}
         {(activeTab !== 'general' && activeTab !== 'fares' && activeTab !== 'dashboard' && activeTab !== 'users' && activeTab !== 'trips' && activeTab !== 'analytics' && activeTab !== 'drivers' && activeTab !== 'audit') && <p className="text-slate-400">Select an admin section.</p>}
         {activeTab !== 'general' && activeTab !== 'fares' && activeTab !== 'dashboard' && activeTab !== 'users' && activeTab !== 'trips' && activeTab !== 'analytics' && activeTab !== 'drivers' && activeTab !== 'audit' ? null : null}
         {activeTab !== 'general' && activeTab !== 'fares' ? null : (

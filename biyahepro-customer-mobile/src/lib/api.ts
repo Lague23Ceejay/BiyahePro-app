@@ -11,6 +11,18 @@ import type {
 } from '@/src/types/api';
 import { loadSession, saveSession } from '@/src/lib/session';
 
+type ActiveSession = AuthResponse & { rememberDevice?: boolean };
+let activeSession: ActiveSession | null = null;
+let onSessionRefresh: ((session: ActiveSession) => void) | null = null;
+
+export function setActiveSession(
+  session: ActiveSession | null,
+  onRefresh?: (session: ActiveSession) => void,
+) {
+  activeSession = session;
+  onSessionRefresh = onRefresh || null;
+}
+
 const fallbackBaseUrl = Platform.select({
   android: 'http://10.0.2.2:5000',
   ios: 'http://localhost:5000',
@@ -42,14 +54,17 @@ async function readError(response: Response) {
 }
 
 async function refreshAccessToken() {
-  const session = await loadSession();
+  const session = activeSession || await loadSession();
   if (!session?.refreshToken) return null;
 
   const refreshed = await request<AuthResponse>('/api/auth/refresh', {
     method: 'POST',
     body: JSON.stringify(session.refreshToken),
   }, undefined, false);
-  await saveSession({ ...refreshed, rememberDevice: session.rememberDevice });
+  const nextSession = { ...refreshed, rememberDevice: session.rememberDevice };
+  activeSession = nextSession;
+  if (session.rememberDevice) await saveSession(nextSession);
+  onSessionRefresh?.(nextSession);
   return refreshed.accessToken;
 }
 

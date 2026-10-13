@@ -275,7 +275,7 @@ export default function NewBookingScreen() {
         <LeafletMapPicker
           key={serviceArea ? `${serviceArea.latitude}-${serviceArea.longitude}-${serviceArea.radiusKm}` : 'default-service-area'}
           ref={mapRef}
-          initialCenter={center}
+          initialCenter={serviceArea || center}
           initialZoom={15}
           pickup={pickup}
           dropoff={dropoff}

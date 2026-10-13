@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
-import { api } from '@/src/lib/api';
+import { api, setActiveSession } from '@/src/lib/api';
 import { clearSession, loadSession, saveSession } from '@/src/lib/session';
 import type { AuthResponse, RegisterPayload } from '@/src/types/api';
 
@@ -19,7 +19,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     loadSession().then((stored) => {
-      setSession(stored?.role === 'customer' ? stored : null);
+      const next = stored?.role === 'customer' ? stored : null;
+      setSession(next);
+      setActiveSession(next, setSession);
       setIsLoading(false);
     });
   }, []);
@@ -32,6 +34,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       if (next.role !== 'customer') throw new Error('Please use a customer account in this app.');
       const saved = { ...next, rememberDevice };
       if (rememberDevice) await saveSession(saved); else await clearSession();
+      setActiveSession(saved, setSession);
       setSession(saved);
     },
     async register(payload, rememberDevice) {
@@ -39,10 +42,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
       if (next.role !== 'customer') throw new Error('Customer registration failed.');
       const saved = { ...next, rememberDevice };
       if (rememberDevice) await saveSession(saved); else await clearSession();
+      setActiveSession(saved, setSession);
       setSession(saved);
     },
     async signOut() {
       await clearSession();
+      setActiveSession(null);
       setSession(null);
     },
   }), [session, isLoading]);
