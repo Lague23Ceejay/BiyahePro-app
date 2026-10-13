@@ -48,6 +48,10 @@ export type Trip = {
   pickupAddress: string;
   dropoffAddress: string;
   status: string;
+  pickupLatitude?: number;
+  pickupLongitude?: number;
+  dropoffLatitude?: number;
+  dropoffLongitude?: number;
   fareAmount: number;
   paymentMethod: string;
   vehicleType: 'motorcycle' | 'motorcab';

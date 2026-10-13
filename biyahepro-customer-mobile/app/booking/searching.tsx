@@ -3,6 +3,9 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/src/context/AuthContext';
 import { api } from '@/src/lib/api';
+import { describeProgress } from '@/src/lib/geo';
+import { LiveTripMap } from '@/src/components/LiveTripMap';
+import type { Trip } from '@/src/types/api';
 import { useTripUpdates } from '@/src/lib/tripHub';
 import { colors } from '@/src/theme/colors';
 
@@ -11,26 +14,30 @@ const LIVE_STATUSES = ['accepted', 'en_route', 'arrived', 'in_progress'];
 export default function SearchingForDriverScreen() {
   const { session } = useAuth();
   const { tripId } = useLocalSearchParams<{ tripId?: string }>();
-  const { status: pushedStatus, connectionState } = useTripUpdates(tripId, session?.accessToken, 'requested');
-  const [seedStatus, setSeedStatus] = useState<string | null>(null);
+  const { status: pushedStatus, connectionState, driverLocation } = useTripUpdates(tripId, session?.accessToken, 'requested');
+  // Full trip snapshot: gives us the pickup/drop-off coordinates for the map,
+  // the driver's name/plate, and doubles as the one-time status catch-up.
+  const [trip, setTrip] = useState<Trip | null>(null);
+  const seedStatus = trip?.status ?? null;
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState('');
   const navigatedRef = useRef(false);
 
-  // One-time catch-up: covers a status change that happened in the gap
-  // between the booking POST and the socket finishing its handshake.
-  // Everything after that is driven live by the hub above.
+  // Catch-up + trip details. Re-runs when the pushed status changes so the
+  // driver's name/plate show up as soon as someone accepts. Each run's
+  // cleanup flips `active`, so a slow response from an earlier run can never
+  // overwrite a newer snapshot (out-of-order responses are simply dropped).
   useEffect(() => {
     if (!session || !tripId) return;
     let active = true;
     api.getTripHistory(session.accessToken, 1, 20)
       .then((result) => {
-        const trip = result.items.find((item) => item.id === tripId);
-        if (active && trip) setSeedStatus(trip.status);
+        const found = result.items.find((item) => item.id === tripId);
+        if (active && found) setTrip(found);
       })
       .catch(() => {});
     return () => { active = false; };
-  }, [session, tripId]);
+  }, [session, tripId, pushedStatus]);
 
   const status = pushedStatus === 'requested' && seedStatus ? seedStatus : pushedStatus;
 
@@ -48,6 +55,32 @@ export default function SearchingForDriverScreen() {
   const currentStatus = status ?? 'requested';
   const assigned = LIVE_STATUSES.includes(currentStatus);
 
+  const pickup = trip && trip.pickupLatitude != null && trip.pickupLongitude != null
+    ? { latitude: trip.pickupLatitude, longitude: trip.pickupLongitude } : null;
+  const dropoff = trip && trip.dropoffLatitude != null && trip.dropoffLongitude != null
+    ? { latitude: trip.dropoffLatitude, longitude: trip.dropoffLongitude } : null;
+  const target: 'pickup' | 'dropoff' = currentStatus === 'in_progress' ? 'dropoff' : 'pickup';
+  const progress = describeProgress(driverLocation, target === 'dropoff' ? dropoff : pickup);
+
+  // Copy that follows the ride instead of saying "on the way" the whole time.
+  const driverInfo = [trip?.driverName, trip?.plateNumber].filter(Boolean).join(' · ');
+  let title = 'Finding your driver';
+  let subtitle = 'We sent your booking to available drivers nearby.';
+  let liveCopy = 'Waiting for a driver to accept your booking';
+  if (currentStatus === 'arrived') {
+    title = 'Your driver has arrived';
+    subtitle = driverInfo ? `Meet ${driverInfo} at the pickup point.` : 'Meet your driver at the pickup point.';
+    liveCopy = 'Driver is at the pickup point';
+  } else if (currentStatus === 'in_progress') {
+    title = 'Trip in progress';
+    subtitle = 'Sit back — you are on your way to your destination.';
+    liveCopy = progress === 'Right here' ? 'Arriving at your destination' : progress ? `${progress} to destination` : 'On the way to your destination';
+  } else if (assigned) {
+    title = 'Driver on the way';
+    subtitle = driverInfo ? `${driverInfo} is heading to your pickup point.` : 'Your ride has been accepted. Your driver is on the way.';
+    liveCopy = progress === 'Right here' ? 'Your driver is almost there' : progress ? `${progress} away` : 'Locating your driver…';
+  }
+
   async function cancelBooking() {
     if (!session?.accessToken || !tripId) return;
     setCancelling(true);
@@ -64,9 +97,15 @@ export default function SearchingForDriverScreen() {
 
   return (
     <View style={styles.page}>
-      <View style={styles.circle}><ActivityIndicator size="large" color={colors.brand} /></View>
-      <Text style={styles.title}>{assigned ? 'Driver found' : 'Finding your driver'}</Text>
-      <Text style={styles.subtitle}>{assigned ? 'Your ride has been accepted. Your driver is on the way.' : 'We sent your booking to available drivers nearby.'}</Text>
+      {assigned ? (
+        <View style={styles.mapWrap}>
+          <LiveTripMap pickup={pickup} dropoff={dropoff} driver={driverLocation} target={target} driverLabel="Driver" height={250} />
+        </View>
+      ) : (
+        <View style={styles.circle}><ActivityIndicator size="large" color={colors.brand} /></View>
+      )}
+      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.subtitle}>{subtitle}</Text>
 
       <View style={styles.statusCard}>
         <View style={[styles.statusDot, connectionState !== 'connected' && styles.statusDotMuted]} />
@@ -77,7 +116,7 @@ export default function SearchingForDriverScreen() {
               ? 'Connecting to live tracking…'
               : connectionState === 'disconnected'
                 ? 'Reconnecting…'
-                : assigned ? 'Ride accepted' : 'Waiting for a driver to accept your booking'}
+                : liveCopy}
           </Text>
         </View>
       </View>
@@ -94,6 +133,7 @@ export default function SearchingForDriverScreen() {
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.background, padding: 24, alignItems: 'center', justifyContent: 'center' },
+  mapWrap: { width: '100%', borderRadius: 18, overflow: 'hidden', marginBottom: 18, borderWidth: 1, borderColor: colors.border },
   circle: { width: 104, height: 104, borderRadius: 52, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center', marginBottom: 26 },
   title: { fontSize: 28, fontWeight: '900', color: colors.text, textAlign: 'center' },
   subtitle: { marginTop: 8, color: colors.muted, textAlign: 'center', lineHeight: 21, maxWidth: 330 },

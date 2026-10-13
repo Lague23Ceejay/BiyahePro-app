@@ -72,7 +72,11 @@ export function useTripUpdates(tripId: string | undefined, token: string | undef
       setState((prev) => ({ ...prev, status: 'cancelled', cancelled: true }));
     };
 
-    const onDriverLocationUpdated = (payload: { latitude: number; longitude: number; driverId: string }) => {
+    const onDriverLocationUpdated = (payload: { tripId?: string; latitude: number; longitude: number; driverId: string }) => {
+      // The connection is shared across screens, so ignore pings that belong
+      // to a different trip's room (the server includes tripId on each ping).
+      if (payload.tripId && payload.tripId !== tripId) return;
+      if (!Number.isFinite(payload.latitude) || !Number.isFinite(payload.longitude)) return;
       setState((prev) => ({
         ...prev,
         driverId: payload.driverId,

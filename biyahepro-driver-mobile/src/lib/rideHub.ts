@@ -40,10 +40,10 @@ async function ensureStarted(nextConnection: signalR.HubConnection) {
     await nextConnection.start();
 }
 
-export async function setHubAvailability(token: string, available: boolean) {
+export async function sendTripLocation(token: string, tripId: string, latitude: number, longitude: number) {
   const nextConnection = getConnection(token);
   await ensureStarted(nextConnection);
-  await nextConnection.invoke('SetAvailability', available);
+  await nextConnection.invoke('UpdateDriverLocation', tripId, latitude, longitude);
 }
 
 export function stopDriverRideHub() {

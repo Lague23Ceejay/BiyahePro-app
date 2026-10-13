@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { MapPreview } from '@/src/components/MapPreview';
+import { LiveTripMap } from '@/src/components/LiveTripMap';
+import { describeProgress } from '@/src/lib/geo';
+import { useTripLocationBroadcast } from '@/src/lib/useTripLocationBroadcast';
 import { api } from '@/src/lib/api';
 import { useAuth } from '@/src/context/AuthContext';
 import { colors } from '@/src/theme/colors';
@@ -76,9 +79,24 @@ export default function ActiveScreen() {
 
   const step = trip ? STEP[trip.status] : undefined;
 
+  // Live tracking: while a trip is active, watch GPS, stream it to the
+  // customer, and use the same position to show distance on this screen.
+  const tripIsActive = !!trip && activeStatuses.has(trip.status);
+  const { position, error: gpsError } = useTripLocationBroadcast(session?.accessToken, trip?.id, tripIsActive);
+  const pickup = trip && trip.pickupLatitude != null && trip.pickupLongitude != null
+    ? { latitude: trip.pickupLatitude, longitude: trip.pickupLongitude } : null;
+  const dropoff = trip && trip.dropoffLatitude != null && trip.dropoffLongitude != null
+    ? { latitude: trip.dropoffLatitude, longitude: trip.dropoffLongitude } : null;
+  const target: 'pickup' | 'dropoff' = trip?.status === 'in_progress' ? 'dropoff' : 'pickup';
+  const targetName = target === 'pickup' ? 'pickup' : 'drop-off';
+  const rawProgress = describeProgress(position, target === 'pickup' ? pickup : dropoff);
+  const progress = rawProgress === 'Right here' ? `At the ${targetName} point` : rawProgress ? `${rawProgress} to ${targetName}` : null;
+
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.content}>
-      <MapPreview compact />
+      {trip && (pickup || dropoff)
+        ? <LiveTripMap pickup={pickup} dropoff={dropoff} driver={position} target={target} driverLabel="You" height={250} />
+        : <MapPreview compact />}
       {loading ? (
         <View style={styles.empty}><ActivityIndicator color={colors.brand} /></View>
       ) : !trip ? (
@@ -94,6 +112,12 @@ export default function ActiveScreen() {
             <Text><Text style={styles.green}>●</Text> {trip.pickupAddress}</Text>
             <Text><Text style={styles.orange}>●</Text> {trip.dropoffAddress}</Text>
           </View>
+          {tripIsActive && (
+            <View style={styles.progressBox}>
+              <Text style={styles.progressText}>{progress ?? 'Locating you…'}</Text>
+            </View>
+          )}
+          {!!gpsError && <Text style={styles.error}>{gpsError}</Text>}
           <Text style={styles.fare}>₱{Number(trip.fareAmount || 0).toFixed(2)}</Text>
 
           {!!error && <Text style={styles.error}>{error}</Text>}
@@ -119,6 +143,8 @@ const styles = StyleSheet.create({
   step: { color: colors.brand, fontWeight: '800', textTransform: 'capitalize', marginBottom: 10 },
   name: { color: colors.text, fontWeight: '800', fontSize: 16 },
   route: { backgroundColor: '#F8F9FA', borderRadius: 10, padding: 12, gap: 9, marginVertical: 15 },
+  progressBox: { backgroundColor: '#FFF4EC', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 12 },
+  progressText: { color: colors.brand, fontWeight: '800', fontSize: 14 },
   green: { color: colors.success },
   orange: { color: colors.brand },
   fare: { color: colors.brand, fontWeight: '900', fontSize: 17 },
