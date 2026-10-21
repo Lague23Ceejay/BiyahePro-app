@@ -120,7 +120,9 @@ public class AuthService(
 
     public async Task<AuthResponse?> LoginAsync(LoginRequest request)
     {
-        var user = await userRepo.GetByEmailAsync(request.Email.ToLowerInvariant());
+        var identifier = request.Email.Trim();
+        var user = await userRepo.GetByEmailAsync(identifier.ToLowerInvariant())
+            ?? await userRepo.GetByPhoneAsync(identifier);
         if (user == null || !user.IsActive) return null;
         // Guard against a null/empty hash (e.g. bad mapping, corrupted row) so
         // this fails as "invalid credentials" instead of throwing a 500 —

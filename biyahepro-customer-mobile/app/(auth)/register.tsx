@@ -25,7 +25,8 @@ export default function RegisterScreen() {
     finally { setLoading(false); }
   }
 
-  const valid = fullName && email && phone && password.length >= 8;
+  const passwordValid = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(password);
+  const valid = Boolean(fullName.trim() && email.trim() && phone.trim() && passwordValid);
   return (
     <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -35,6 +36,7 @@ export default function RegisterScreen() {
         <AppInput label="Email" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} placeholder="you@example.com" />
         <AppInput label="Phone" keyboardType="phone-pad" value={phone} onChangeText={setPhone} placeholder="09XXXXXXXXX" />
         <AppInput label="Password" secureTextEntry value={password} onChangeText={setPassword} placeholder="8+ chars, uppercase, number, symbol" />
+        <Text style={styles.hint}>Use at least 8 characters with an uppercase letter, number, and symbol.</Text>
         <Pressable style={styles.remember} onPress={() => setRememberDevice(value => !value)}><Text style={styles.checkbox}>{rememberDevice ? '✓' : ''}</Text><Text style={styles.rememberText}>Remember this device</Text></Pressable>
         {!!error && <Text style={styles.error}>{error}</Text>}
         <AppButton title="Create customer account" onPress={submit} loading={loading} disabled={!valid} />
@@ -49,6 +51,7 @@ const styles = StyleSheet.create({
   content: { flexGrow: 1, justifyContent: 'center', padding: 24, gap: 14 },
   title: { fontSize: 30, fontWeight: '900', color: colors.text },
   subtitle: { fontSize: 15, color: colors.muted, marginBottom: 10 },
+  hint: { fontSize: 12, color: colors.muted, marginTop: -8 },
   error: { color: colors.danger, fontSize: 13 }, remember: { flexDirection: 'row', alignItems: 'center', gap: 8 }, checkbox: { width: 20, height: 20, borderWidth: 1, borderColor: colors.brand, borderRadius: 5, textAlign: 'center', color: colors.brand, fontWeight: '900' }, rememberText: { color: colors.muted, fontSize: 12 },
   footer: { textAlign: 'center', color: colors.muted, marginTop: 8 },
   link: { color: colors.brand, fontWeight: '700' },
