@@ -8,9 +8,10 @@ module.exports = {
     userInterfaceStyle: 'light',
     newArchEnabled: true,
     
-    updates: process.env.NODE_ENV === 'development'
-      ? { enabled: false }
-      : { url: 'https://u.expo.dev/637f23ab-c183-42de-8103-27f2cb91b697' },
+    updates: {
+      url: 'https://u.expo.dev/637f23ab-c183-42de-8103-27f2cb91b697',
+      enabled: process.env.NODE_ENV !== 'development',
+    },
     runtimeVersion: {
       policy: "appVersion"
     },

@@ -50,7 +50,7 @@ public class AuthService(
         try
         {
             var created = await userRepo.CreateAsync(user);
-            return (BuildAuthResponse(created), null);
+            return (await BuildRegisteredAuthResponseAsync(created), null);
         }
         catch (Npgsql.PostgresException ex) when (ex.SqlState == Npgsql.PostgresErrorCodes.UniqueViolation)
         {
@@ -115,7 +115,7 @@ public class AuthService(
             return (null, "Plate number already registered.");
         }
 
-        return (BuildAuthResponse(created), null);
+        return (await BuildRegisteredAuthResponseAsync(created), null);
     }
 
     public async Task<AuthResponse?> LoginAsync(LoginRequest request)
@@ -161,6 +161,14 @@ public class AuthService(
         var accessToken = GenerateJwt(user);
         refreshToken ??= GenerateRefreshToken();
         return new AuthResponse(accessToken, refreshToken, user.Role, user.Id, user.FullName);
+    }
+
+    private async Task<AuthResponse> BuildRegisteredAuthResponseAsync(User user)
+    {
+        var refreshToken = GenerateRefreshToken();
+        var expiryDays = config.GetValue<int>("Jwt:RefreshTokenExpiryDays", 7);
+        await userRepo.SaveRefreshTokenAsync(user.Id, refreshToken, DateTime.UtcNow.AddDays(expiryDays));
+        return BuildAuthResponse(user, refreshToken);
     }
 
     private string GenerateJwt(User user)

@@ -9,9 +9,10 @@ module.exports = {
     userInterfaceStyle: 'automatic',
     newArchEnabled: true,
     
-    updates: process.env.NODE_ENV === 'development'
-      ? { enabled: false }
-      : { url: 'https://u.expo.dev/6c3be8ab-0d3d-4f09-9f8c-f8aeccbd099f' },
+    updates: {
+      url: 'https://u.expo.dev/6c3be8ab-0d3d-4f09-9f8c-f8aeccbd099f',
+      enabled: process.env.NODE_ENV !== 'development',
+    },
     runtimeVersion: {
       policy: "appVersion"
     },
