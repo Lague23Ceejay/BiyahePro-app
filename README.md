@@ -230,6 +230,7 @@ If `SUPABASE_CONNECTION_STRING` is supplied, Compose uses that connection string
 - **API cannot connect to PostgreSQL:** check the `db` health status and verify `POSTGRES_*` and `APP_DB_*` values. The API must use `Host=db`, not `Host=localhost`.
 - **Phone cannot reach the API:** verify `HOST_LAN_IP`, that the phone and computer share a network, and that Windows Firewall allows port `5000`.
 - **Expo QR code points to an unreachable address:** set `HOST_LAN_IP` to the computer's actual Wi-Fi/LAN IPv4 address and restart the mobile service.
+- **Expo Go reports a remote update download error:** restart the Expo service and scan its current QR code. Development mode disables EAS Update checks; installed preview/production APKs still require an existing EAS channel with a published update.
 - **Database changes do not appear:** existing data volumes do not rerun initialization scripts. Apply the SQL change manually, or remove the local volume with `docker compose down -v` when it is safe to recreate the database.
 - **Frontend changes do not appear:** confirm the service is running with its bind mount and that polling is enabled. The Compose file sets `CHOKIDAR_USEPOLLING=true` for the Vite and Expo services.
 

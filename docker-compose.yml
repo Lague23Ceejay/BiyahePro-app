@@ -102,6 +102,9 @@ services:
       # host used in biyahepro-customer-mobile/.env's EXPO_PUBLIC_API_URL.
       REACT_NATIVE_PACKAGER_HOSTNAME: ${HOST_LAN_IP}
       CHOKIDAR_USEPOLLING: "true"
+      # Expo needs to write generated files to the bind-mounted project, and
+      # Electron DevTools needs its sandbox disabled when running as root.
+      ELECTRON_DISABLE_SANDBOX: "1"
 
     tty: true
     stdin_open: true
@@ -109,6 +112,7 @@ services:
     volumes:
       - ./biyahepro-customer-mobile:/app
       - /app/node_modules
+      - /app/.expo
 
     ports:
       - "8081:8081"
@@ -130,6 +134,8 @@ services:
       EXPO_PUBLIC_API_URL: http://${HOST_LAN_IP}:5000
       REACT_NATIVE_PACKAGER_HOSTNAME: ${HOST_LAN_IP}
       CHOKIDAR_USEPOLLING: "true"
+      # The DevTools Electron shell cannot use its setuid sandbox in Docker.
+      ELECTRON_DISABLE_SANDBOX: "1"
 
     tty: true
     stdin_open: true
@@ -137,6 +143,7 @@ services:
     volumes:
       - ./biyahepro-driver-mobile:/app
       - /app/node_modules
+      - /app/.expo
 
     ports:
       - "8082:8082"

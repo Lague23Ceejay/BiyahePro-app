@@ -9,10 +9,9 @@ module.exports = {
     userInterfaceStyle: 'automatic',
     newArchEnabled: true,
     
-    // 🛡️ ENFORCED CORRECT EAS UPDATE FIELDS FOR CUSTOMER APP
-    updates: {
-      url: "https://u.expo.dev/6c3be8ab-0d3d-4f09-9f8c-f8aeccbd099f"
-    },
+    updates: process.env.NODE_ENV === 'development'
+      ? { enabled: false }
+      : { url: 'https://u.expo.dev/6c3be8ab-0d3d-4f09-9f8c-f8aeccbd099f' },
     runtimeVersion: {
       policy: "appVersion"
     },
