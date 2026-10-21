@@ -431,3 +431,6 @@ Log in via `POST /api/auth/login` to get an access token, then send it as `Autho
   plugin addition soon
 
   npx plugins add vercel/vercel-plugin
+
+## initiate a brand-new production artifact compilation
+  eas build --platform android --profile preview
