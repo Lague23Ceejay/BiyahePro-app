@@ -113,6 +113,10 @@ export default function LiveHomeScreen() {
         </Pressable>
       </View>
 
+      <Text style={styles.locationNotice}>
+        For dispatch and safety, your live location is shared with BiyahePro operations while you use this app in the foreground, even when you are not on a trip.
+      </Text>
+
       <View style={styles.stats}>
         <Stat value={String(profile?.totalTrips ?? 0)} label="Trips" />
         <Stat value={`P${Number(profile?.rating ?? 0).toFixed(1)}`} label="Rating" />
@@ -185,6 +189,9 @@ function RequestCard({ request, onAccept, onDecline }: { request: any; onAccept:
       </View>
 
       <Text style={styles.fare}>P{Number(request.fareAmount || 0).toFixed(2)}</Text>
+      {request.spScStatus === 'pending' && (
+        <Text style={styles.spScPending}>Passenger requests SP/SC pricing. Check a valid ID at pickup before starting the trip.</Text>
+      )}
 
       <View style={styles.buttonGroup}>
         <Pressable onPress={onDecline} style={styles.declineButton}>
@@ -239,6 +246,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '800',
     fontSize: 12,
+  },
+  locationNotice: {
+    color: colors.muted,
+    fontSize: 11,
+    lineHeight: 16,
+    marginHorizontal: 18,
+    marginTop: 12,
+    marginBottom: 4,
   },
   stats: {
     backgroundColor: colors.brand,
@@ -308,6 +323,13 @@ const styles = StyleSheet.create({
     color: colors.brand,
     fontWeight: '900',
     fontSize: 17,
+    marginBottom: 10,
+  },
+  spScPending: {
+    color: '#8A5A00',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
     marginBottom: 10,
   },
   buttonGroup: {

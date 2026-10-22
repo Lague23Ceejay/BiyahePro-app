@@ -22,6 +22,7 @@ public class Driver
     // Unpacked from PostGIS GEOGRAPHY column in repository
     public double?  Latitude              { get; set; }
     public double?  Longitude             { get; set; }
+    public DateTime? LastLocationAt       { get; set; }
 
     public decimal  Rating                { get; set; } = 5.00m;
 
@@ -128,6 +129,17 @@ public record NearbyDriverResponse(
     string  PlateNumber,
     string  VehicleModel,
     string  VehicleColor
+);
+
+public record DriverLocationMonitoringResponse(
+    Guid DriverId,
+    string FullName,
+    string Status,
+    double? Latitude,
+    double? Longitude,
+    DateTime? LastLocationAt,
+    string? PlateNumber,
+    string? VehicleModel
 );
 
 public record DriverStatusResponse(

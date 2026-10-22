@@ -22,15 +22,40 @@ public class TripsController(ITripService tripService, IFareService fareService)
     [HttpPost("estimate")]
     [AllowAnonymous]
     public async Task<IActionResult> Estimate([FromBody] FareEstimateRequest req)
-        => Ok(await fareService.EstimateAsync(req));
+    {
+        try
+        {
+            return Ok(await fareService.EstimateAsync(req));
+        }
+        catch (InvalidOperationException error)
+        {
+            return BadRequest(new { message = error.Message });
+        }
+    }
 
     // POST: api/trips (Passengers use this to book an open trip)
     [HttpPost]
     [Authorize(Roles = "customer")]
     public async Task<IActionResult> Book([FromBody] BookTripRequest req)
     {
-        var trip = await tripService.BookAsync(CurrentUserId, req);
-        if (trip == null) return BadRequest(new { message = "Unable to process booking request." });
+        try
+        {
+            var trip = await tripService.BookAsync(CurrentUserId, req);
+            if (trip == null) return BadRequest(new { message = "Unable to process booking request." });
+            return Ok(trip);
+        }
+        catch (InvalidOperationException error)
+        {
+            return BadRequest(new { message = error.Message });
+        }
+    }
+
+    [HttpPatch("{id:guid}/sp-sc-verification")]
+    [Authorize(Roles = "driver")]
+    public async Task<IActionResult> VerifySpSc(Guid id, [FromBody] SpScVerificationRequest req)
+    {
+        var trip = await tripService.VerifySpScAsync(id, CurrentUserId, req.Eligible);
+        if (trip == null) return BadRequest(new { message = "SP/SC eligibility can only be verified by the assigned driver at pickup." });
         return Ok(trip);
     }
 

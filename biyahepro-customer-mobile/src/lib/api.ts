@@ -31,6 +31,17 @@ const fallbackBaseUrl = Platform.select({
 
 export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || fallbackBaseUrl || '').replace(/\/$/, '');
 export type ServiceArea = { latitude: number; longitude: number; radiusKm: number };
+export async function getFareBookingFee(): Promise<number> {
+  const response = await fetch(`${API_BASE_URL}/api/settings/public`);
+  if (!response.ok) throw new Error('Unable to load the current booking fee.');
+  const settings = await response.json() as Array<{ key: string; value: string }>;
+  const setting = settings.find(item => item.key === 'fare.booking_fee');
+  const bookingFee = Number(setting?.value);
+  if (!setting || !Number.isFinite(bookingFee) || bookingFee < 0)
+    throw new Error('The public booking fee is not configured.');
+  return bookingFee;
+}
+
 export async function getServiceArea(): Promise<ServiceArea> {
   const response = await fetch(`${API_BASE_URL}/api/settings/public`);
   if (!response.ok) throw new Error('Unable to load service area.');

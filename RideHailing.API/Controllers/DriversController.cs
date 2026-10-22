@@ -113,6 +113,15 @@ public class DriversController(IDriverService driverService, ITripService tripSe
         return Ok(result);
     }
 
+    // GET: api/drivers/locations (Admin-only current and last-known fleet locations)
+    [HttpGet("locations")]
+    [Authorize(Roles = "admin")]
+    public async Task<IActionResult> GetLocationMonitoring()
+    {
+        var locations = await driverService.GetLocationMonitoringAsync();
+        return Ok(locations);
+    }
+
     // ── Driver Performance Index / Three-Strike Policy (BP §VI, §IX) ──
 
     // POST: api/drivers/{id}/strikes — issue a strike against a driver.

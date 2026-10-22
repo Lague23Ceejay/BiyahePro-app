@@ -16,6 +16,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
+import type { MapZone } from '@/src/data/dapitanZones';
 
 // react-native-webview's type definitions still model WebView as a class
 // component with a single generic default (`WebView<P = undefined>`),
@@ -33,6 +34,11 @@ export type LatLng = { latitude: number; longitude: number };
 export type LeafletMapPickerHandle = {
   /** Recenter the map (e.g. after "Use my location" or switching pickup/dropoff focus). */
   flyTo: (point: LatLng, zoom?: number) => void;
+  /**
+   * Zoom to one fare zone and show its places as tappable dots. Pass null to
+   * clear the highlight and zoom back out to show every zone.
+   */
+  focusZone: (zoneId: string | null) => void;
 };
 
 type Props = {
@@ -45,12 +51,20 @@ type Props = {
   /** Called once, when the Leaflet page has finished loading and is interactive. */
   onReady?: () => void;
   serviceArea?: { latitude: number; longitude: number; radiusKm: number };
+  /** Fare zones to draw as coloured areas with a tappable "Zone N" label. */
+  zones?: MapZone[];
+  /** Zone to zoom into as soon as the map is ready (used when the picker opens on a chosen zone). */
+  initialFocusZoneId?: string | null;
+  /** Called when the user taps a "Zone N" label on the map. */
+  onZonePress?: (zoneId: string) => void;
+  /** Called when the user taps one of a focused zone's place dots. */
+  onPlacePress?: (zoneId: string, placeId: string) => void;
 };
 
 // Self-contained HTML string — no bundling step needed, the WebView loads
 // this directly. Leaflet's JS/CSS come from unpkg's CDN.
-function buildHtml({ latitude, longitude }: LatLng, zoom: number, serviceArea?: Props['serviceArea']) {
-  const circle = serviceArea ? `var serviceAreaCircle = L.circle([${serviceArea.latitude}, ${serviceArea.longitude}], { radius: ${serviceArea.radiusKm * 1000}, color: '#FF6412', fillColor: '#FF6412', fillOpacity: 0.12 }).addTo(map); map.fitBounds(serviceAreaCircle.getBounds(), { padding: [24, 24] });` : '';
+function buildHtml({ latitude, longitude }: LatLng, zoom: number, serviceArea?: Props['serviceArea'], zones: MapZone[] = []) {
+  const circle = serviceArea ? `L.circle([${serviceArea.latitude}, ${serviceArea.longitude}], { radius: ${serviceArea.radiusKm * 1000}, color: '#FF6412', fillColor: '#FF6412', fillOpacity: 0.08 }).addTo(map);` : '';
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -64,6 +78,15 @@ function buildHtml({ latitude, longitude }: LatLng, zoom: number, serviceArea?: 
     }
     .pickup-icon { background: #1F8A56; }
     .dropoff-icon { background: #E85D5D; }
+    .zone-label {
+      width: 74px; height: 22px; line-height: 22px; text-align: center; border-radius: 11px;
+      color: #fff; font: 800 11px/22px sans-serif; white-space: nowrap;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.35); border: 2px solid #fff; box-sizing: border-box;
+    }
+    .place-dot {
+      width: 14px; height: 14px; border-radius: 7px; background: #fff; border: 3px solid #555;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4); box-sizing: border-box;
+    }
   </style>
 </head>
 <body>
@@ -91,14 +114,65 @@ function buildHtml({ latitude, longitude }: LatLng, zoom: number, serviceArea?: 
       }
     }
 
+    // ── Fare zones ─────────────────────────────────────────────────────
+    // The shapes are non-interactive on purpose: taps inside a zone must
+    // still fall through to the map so the user can drop a pin anywhere.
+    // Only the "Zone N" labels and (for a focused zone) the place dots are
+    // tappable.
+    var ZONES = ${JSON.stringify(zones)};
+    var zoneLayers = {};
+    ZONES.forEach(function (z) {
+      var style = { color: z.color, weight: 2, fillColor: z.color, fillOpacity: 0.12, interactive: false };
+      var shape = z.circle
+        ? L.circle([z.circle.latitude, z.circle.longitude], Object.assign({ radius: z.circle.radiusKm * 1000 }, style))
+        : L.polygon(z.outline, style);
+      shape.addTo(map);
+
+      var label = L.marker([z.labelAt.latitude, z.labelAt.longitude], {
+        icon: L.divIcon({
+          className: '',
+          html: '<div class="zone-label" style="background:' + z.color + '">' + z.label + '</div>',
+          iconSize: [74, 22],
+          iconAnchor: [37, 11]
+        }),
+        zIndexOffset: 500
+      }).addTo(map);
+      label.on('click', function () { post({ type: 'zonePress', zoneId: z.id }); });
+
+      var places = L.layerGroup();
+      z.places.forEach(function (pl) {
+        var dot = L.marker([pl.latitude, pl.longitude], {
+          icon: L.divIcon({
+            className: '',
+            html: '<div class="place-dot" style="border-color:' + z.color + '"></div>',
+            iconSize: [14, 14],
+            iconAnchor: [7, 7]
+          })
+        }).bindTooltip(pl.name, { direction: 'top', offset: [0, -8] });
+        dot.on('click', function () { post({ type: 'placePress', zoneId: z.id, placeId: pl.id }); });
+        places.addLayer(dot);
+      });
+      zoneLayers[z.id] = { shape: shape, places: places };
+    });
+
+    function focusZone(zoneId) {
+      var ids = Object.keys(zoneLayers);
+      ids.forEach(function (id) {
+        var layer = zoneLayers[id];
+        var on = id === zoneId;
+        layer.shape.setStyle({ fillOpacity: on ? 0.28 : (zoneId ? 0.05 : 0.12), weight: on ? 3 : 2 });
+        if (on) { map.addLayer(layer.places); } else { map.removeLayer(layer.places); }
+      });
+      if (zoneId && zoneLayers[zoneId]) {
+        map.fitBounds(zoneLayers[zoneId].shape.getBounds(), { padding: [30, 30], maxZoom: 15 });
+      } else if (ids.length) {
+        map.fitBounds(L.featureGroup(ids.map(function (id) { return zoneLayers[id].shape; })).getBounds(), { padding: [20, 20] });
+      }
+    }
+
     map.on('click', function (e) {
       post({ type: 'press', latitude: e.latlng.lat, longitude: e.latlng.lng });
     });
-
-    function resizeMap() { map.invalidateSize(); }
-    setTimeout(resizeMap, 100);
-    setTimeout(resizeMap, 400);
-    window.addEventListener('resize', resizeMap);
 
     // Handles commands sent from the RN side (update markers, recenter).
     // Registered on both 'message' and 'document' events — Android fires
@@ -111,6 +185,8 @@ function buildHtml({ latitude, longitude }: LatLng, zoom: number, serviceArea?: 
           dropoffMarker.setLatLng([data.dropoff.latitude, data.dropoff.longitude]);
         } else if (data.type === 'flyTo') {
           map.setView([data.latitude, data.longitude], data.zoom || map.getZoom());
+        } else if (data.type === 'focusZone') {
+          focusZone(data.zoneId);
         }
       } catch (err) {}
     }
@@ -124,17 +200,23 @@ function buildHtml({ latitude, longitude }: LatLng, zoom: number, serviceArea?: 
 }
 
 export const LeafletMapPicker = forwardRef<LeafletMapPickerHandle, Props>(
-  function LeafletMapPicker({ initialCenter, initialZoom = 15, pickup, dropoff, onMapPress, onReady, serviceArea }, ref) {
+  function LeafletMapPicker({
+    initialCenter, initialZoom = 15, pickup, dropoff, onMapPress, onReady, serviceArea,
+    zones, initialFocusZoneId, onZonePress, onPlacePress,
+  }, ref) {
     const webviewRef = useRef<WebView>(null);
     // The HTML is only built once per mount — after that, marker/center
     // updates go through postMessage rather than reloading the page (a
     // reload would flash the tiles and reset zoom/pan on every keystroke).
-    const htmlRef = useRef(buildHtml(initialCenter, initialZoom, serviceArea));
+    const htmlRef = useRef(buildHtml(initialCenter, initialZoom, serviceArea, zones));
     const readyRef = useRef(false);
 
     useImperativeHandle(ref, () => ({
       flyTo(point, zoom) {
         webviewRef.current?.postMessage(JSON.stringify({ type: 'flyTo', ...point, zoom }));
+      },
+      focusZone(zoneId) {
+        webviewRef.current?.postMessage(JSON.stringify({ type: 'focusZone', zoneId }));
       },
     }));
 
@@ -151,12 +233,19 @@ export const LeafletMapPicker = forwardRef<LeafletMapPickerHandle, Props>(
         const data = JSON.parse(event.nativeEvent.data);
         if (data.type === 'press') {
           onMapPress({ latitude: data.latitude, longitude: data.longitude });
+        } else if (data.type === 'zonePress') {
+          onZonePress?.(data.zoneId);
+        } else if (data.type === 'placePress') {
+          onPlacePress?.(data.zoneId, data.placeId);
         } else if (data.type === 'ready') {
           readyRef.current = true;
           onReady?.();
           // Push current marker positions once the page has finished
           // initializing (it starts both markers at initialCenter).
           webviewRef.current?.postMessage(JSON.stringify({ type: 'setMarkers', pickup, dropoff }));
+          if (initialFocusZoneId) {
+            webviewRef.current?.postMessage(JSON.stringify({ type: 'focusZone', zoneId: initialFocusZoneId }));
+          }
         }
       } catch {
         // Ignore malformed messages rather than crashing the screen.

@@ -13,6 +13,7 @@ public interface IDriverRepository
     Task UpdateStatusAsync(Guid driverId, string status);
     Task UpdateLocationAsync(Guid driverId, double lat, double lng);
     Task<List<NearbyDriverResponse>> GetNearbyAsync(double lat, double lng, int radiusKm);
+    Task<List<DriverLocationMonitoringResponse>> GetLocationMonitoringAsync();
     Task<PagedResult<Driver>> GetAllAsync(string? status, int page, int pageSize);
     Task<DriverStrike?> AddStrikeAsync(Guid driverId, string reason, Guid issuedBy);
     Task<List<DriverStrike>> GetStrikesAsync(Guid driverId);
@@ -39,6 +40,7 @@ public class DriverRepository(IConfiguration config) : IDriverRepository
         d.id, d.user_id, d.license_number, d.license_expiry, d.status,
         d.rating, d.dpi_review_flag, d.strike_count, d.suspended_until,
         d.total_trips, d.is_documents_verified, d.created_at, d.updated_at,
+        d.last_location_at,
         ST_Y(d.current_location::geometry) AS latitude,
         ST_X(d.current_location::geometry) AS longitude";
 
@@ -69,7 +71,7 @@ public class DriverRepository(IConfiguration config) : IDriverRepository
     public async Task UpdateLocationAsync(Guid driverId, double lat, double lng)
     {
         using var db = Connection();
-        await db.ExecuteAsync("UPDATE drivers SET current_location = ST_SetSRID(ST_MakePoint(@Lng, @Lat), 4326)::geography, updated_at = NOW() WHERE id = @Id", new { Lat = lat, Lng = lng, Id = driverId });
+        await db.ExecuteAsync("UPDATE drivers SET current_location = ST_SetSRID(ST_MakePoint(@Lng, @Lat), 4326)::geography, last_location_at = NOW(), updated_at = NOW() WHERE id = @Id", new { Lat = lat, Lng = lng, Id = driverId });
     }
 
     public async Task<List<NearbyDriverResponse>> GetNearbyAsync(double lat, double lng, int radiusKm)
@@ -88,6 +90,24 @@ public class DriverRepository(IConfiguration config) : IDriverRepository
         var total = await db.QuerySingleAsync<int>($"SELECT COUNT(*) FROM drivers d {where}", new { Status = status });
         var items = await db.QueryAsync<Driver>($"SELECT {DriverColumns}, u.full_name, u.phone, u.email FROM drivers d JOIN users u ON u.id = d.user_id {where} ORDER BY d.created_at DESC LIMIT @PageSize OFFSET @Offset", new { Status = status, PageSize = pageSize, Offset = offset });
         return new PagedResult<Driver> { Items = items.ToList(), TotalCount = total, Page = page, PageSize = pageSize };
+    }
+
+    public async Task<List<DriverLocationMonitoringResponse>> GetLocationMonitoringAsync()
+    {
+        using var db = Connection();
+        const string sql = @"
+            SELECT d.id AS DriverId, u.full_name AS FullName, d.status AS Status,
+                   ST_Y(d.current_location::geometry) AS Latitude,
+                   ST_X(d.current_location::geometry) AS Longitude,
+                   d.last_location_at AS LastLocationAt,
+                   v.plate_number AS PlateNumber, v.model AS VehicleModel
+            FROM drivers d
+            JOIN users u ON u.id = d.user_id
+            LEFT JOIN vehicles v ON v.driver_id = d.id AND v.is_active = true
+            WHERE d.current_location IS NOT NULL
+            ORDER BY d.last_location_at DESC NULLS LAST, u.full_name";
+        var locations = await db.QueryAsync<DriverLocationMonitoringResponse>(sql);
+        return locations.ToList();
     }
 
     // ── Driver Performance Index / Three-Strike Policy (BP §VI, §IX) ──

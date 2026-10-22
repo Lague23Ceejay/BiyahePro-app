@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS drivers (
     status              TEXT        NOT NULL DEFAULT 'offline'
                                     CHECK (status IN ('offline', 'available', 'on_trip', 'suspended', 'banned')),
     current_location    GEOGRAPHY(POINT, 4326),   -- PostGIS: lat/lng live position
+    last_location_at    TIMESTAMPTZ,              -- Time of most recent driver location ping
     rating              NUMERIC(3,2) NOT NULL DEFAULT 5.00,
     -- Driver Performance Index / Three-Strike Policy (BP §VI Quality Control, §IX Risk Analysis)
     dpi_review_flag     BOOLEAN     NOT NULL DEFAULT false,  -- true when rating drops below 4.2 — triggers automatic review

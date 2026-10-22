@@ -11,6 +11,7 @@ public interface ITripService
 {
     Task<Trip?> BookAsync(Guid customerId, BookTripRequest request);
     Task<Trip?> AcceptAsync(Guid tripId, Guid driverId);
+    Task<Trip?> VerifySpScAsync(Guid tripId, Guid driverUserId, bool eligible);
     Task<Trip?> UpdateStatusAsync(Guid tripId, Guid actorId, string newStatus);
     Task<Trip?> CancelAsync(Guid tripId, Guid actorId, string role, string reason);
     Task<PagedResult<Trip>> GetTripHistoryAsync(Guid userId, string role, int page, int pageSize);
@@ -54,7 +55,10 @@ public class TripService(
 
         var estimate = await fareService.EstimateAsync(new FareEstimateRequest(
             req.PickupLatitude, req.PickupLongitude,
-            req.DropoffLatitude, req.DropoffLongitude));
+            req.DropoffLatitude, req.DropoffLongitude,
+            req.PickupZoneId, req.PickupPlaceId,
+            req.DropoffZoneId, req.DropoffPlaceId,
+            req.SpScRequested));
 
         var trip = new Trip
         {
@@ -66,11 +70,13 @@ public class TripService(
             PickupAddress    = req.PickupAddress,
             DropoffAddress   = req.DropoffAddress,
             PaymentMethod    = req.PaymentMethod,
+            RegularBaseFare  = estimate.BaseFare,
             BaseFare         = estimate.BaseFare,
             DistanceFare     = estimate.EstimatedDistanceFare,
             SurgeMultiplier  = estimate.SurgeMultiplier,
             BookingFee       = estimate.BookingFee,
             FareAmount       = estimate.EstimatedTotal,
+            SpScStatus       = req.SpScRequested ? "pending" : "not_requested",
             // A scheduled trip sits in 'scheduled' (no dispatch) until its
             // time arrives; an immediate booking goes straight to
             // 'requested' as before. See ActivateDueScheduledTripsAsync.
@@ -103,6 +109,7 @@ public class TripService(
             PickupLatitude   = trip.PickupLatitude,
             PickupLongitude  = trip.PickupLongitude,
             FareAmount       = trip.FareAmount,
+            SpScStatus       = trip.SpScStatus,
             PaymentMethod    = trip.PaymentMethod,
             VehicleType      = trip.VehicleType
         });
@@ -168,12 +175,39 @@ public class TripService(
         return trip;
     }
 
+    public async Task<Trip?> VerifySpScAsync(Guid tripId, Guid driverUserId, bool eligible)
+    {
+        var trip = await tripRepo.GetByIdAsync(tripId);
+        if (trip == null || trip.Status != "arrived" || trip.SpScStatus != "pending") return null;
+
+        var driver = await driverRepo.GetByUserIdAsync(driverUserId);
+        if (driver == null || trip.DriverId != driver.Id) return null;
+
+        trip.SpScStatus = eligible ? "verified" : "rejected";
+        trip.BaseFare = eligible
+            ? Math.Round(trip.RegularBaseFare * (1m - OfficialFareSchedule.SpScDiscount), 2, MidpointRounding.AwayFromZero)
+            : trip.RegularBaseFare;
+        trip.FareAmount = trip.BaseFare + trip.BookingFee;
+        await tripRepo.UpdateAsync(trip);
+
+        await hub.Clients.Group($"user_{trip.CustomerId}").SendAsync("TripFareChanged", new
+        {
+            TripId = trip.Id,
+            FareAmount = trip.FareAmount,
+            SpScStatus = trip.SpScStatus
+        });
+
+        return trip;
+    }
+
     public async Task<Trip?> UpdateStatusAsync(Guid tripId, Guid actorId, string newStatus)
     {
         var trip = await tripRepo.GetByIdAsync(tripId);
         if (trip == null) return null;
 
         if (!AllowedTransitions.TryGetValue(trip.Status, out var allowed) || !allowed.Contains(newStatus))
+            return null;
+        if (newStatus == "in_progress" && trip.SpScStatus == "pending")
             return null;
 
         trip.Status = newStatus;

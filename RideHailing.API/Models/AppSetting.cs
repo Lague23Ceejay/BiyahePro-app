@@ -43,10 +43,6 @@ public class SettingsCategoryGroup
 public static class SettingKeys
 {
     // Fare
-    public const string FareBase             = "fare.base_amount";
-    public const string FarePerKm            = "fare.per_km";
-    public const string FarePerMinute        = "fare.per_minute";
-    public const string FareMinimum          = "fare.minimum";
     public const string FareCancellationFee  = "fare.cancellation_fee";
     public const string FareBookingFee       = "fare.booking_fee";
 

@@ -8,12 +8,10 @@
 INSERT INTO app_settings (key, value, data_type, category, label, description, is_public) VALUES
 
 -- ── Fare settings ────────────────────────────────────────────
-('fare.base_amount',       '40.00',  'number',  'fare',       'Base flag-down fare',      'Starting fare for every trip (PHP)',                    false),
-('fare.per_km',            '12.00',  'number',  'fare',       'Per km rate',              'Added to fare for each km travelled (PHP)',              false),
-('fare.per_minute',        '2.50',   'number',  'fare',       'Per minute rate',          'Added to fare for each minute in-trip (PHP)',            false),
-('fare.minimum',           '80.00',  'number',  'fare',       'Minimum fare',             'Lowest possible fare regardless of distance (PHP)',      false),
+-- Regular fares are fixed in OfficialFareSchedule; only the booking
+-- fee is configurable from the admin fare panel.
 ('fare.cancellation_fee',  '25.00',  'number',  'fare',       'Cancellation fee',         'Fee charged when customer cancels after driver accepts', false),
-('fare.booking_fee',       '5.00',   'number',  'fare',       'Booking fee',              'Flat ancillary fee added to every completed ride (PHP) — see BP break-even analysis', false),
+('fare.booking_fee',       '5.00',   'number',  'fare',       'Booking fee',              'Flat booking fee added to every fare (PHP)',                         true),
 
 -- ── Surge settings ───────────────────────────────────────────
 ('surge.enabled',          'true',   'boolean', 'surge',      'Surge pricing enabled',    'Master toggle for surge pricing',                       false),

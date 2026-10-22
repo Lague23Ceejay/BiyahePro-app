@@ -50,6 +50,7 @@ export const api = {
   async setAvailability(token: string, available: boolean) { return request<void>('/api/drivers/me/status', { method: 'PATCH', body: JSON.stringify({ available }) }, token); },
   async updateLocation(token: string, latitude: number, longitude: number) { return request<void>('/api/drivers/me/location', { method: 'PATCH', body: JSON.stringify({ latitude, longitude }) }, token); },
   async updateTripStatus(token: string, tripId: string, status: string) { return request<any>(`/api/trips/${tripId}/status`, { method: 'PATCH', body: JSON.stringify({ tripId, status }) }, token); },
+  async verifySpSc(token: string, tripId: string, eligible: boolean) { return request<any>(`/api/trips/${tripId}/sp-sc-verification`, { method: 'PATCH', body: JSON.stringify({ eligible }) }, token); },
   async acceptTrip(token: string, tripId: string) { return request<any>(`/api/trips/${tripId}/accept`, { method: 'POST' }, token); },
   async declineTrip(token: string, tripId: string) { return request<any>(`/api/trips/${tripId}/cancel`, { method: 'POST', body: JSON.stringify({ reason: 'Driver declined the request.' }) }, token); },
 };

@@ -28,6 +28,7 @@ export default function ActiveScreen() {
   const [trip, setTrip] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [advancing, setAdvancing] = useState(false);
+  const [verifyingSpSc, setVerifyingSpSc] = useState(false);
   const [error, setError] = useState('');
   useDriverRideEvents(session?.accessToken, { onTripCancelled: (tripId) => { if (trip?.id === tripId) setTrip(null); } });
 
@@ -62,6 +63,10 @@ export default function ActiveScreen() {
     if (!session?.accessToken || !trip) return;
     const step = STEP[trip.status];
     if (!step) return;
+    if (step.next === 'in_progress' && trip.spScStatus === 'pending') {
+      setError('Verify or reject the SP/SC ID request before starting the trip.');
+      return;
+    }
     setAdvancing(true);
     setError('');
     try {
@@ -74,6 +79,20 @@ export default function ActiveScreen() {
       setError(e instanceof Error ? e.message : 'Unable to update this trip.');
     } finally {
       setAdvancing(false);
+    }
+  }
+
+  async function verifySpSc(eligible: boolean) {
+    if (!session?.accessToken || !trip) return;
+    setVerifyingSpSc(true);
+    setError('');
+    try {
+      await api.verifySpSc(session.accessToken, trip.id, eligible);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to record SP/SC verification.');
+    } finally {
+      setVerifyingSpSc(false);
     }
   }
 
@@ -119,11 +138,37 @@ export default function ActiveScreen() {
           )}
           {!!gpsError && <Text style={styles.error}>{gpsError}</Text>}
           <Text style={styles.fare}>₱{Number(trip.fareAmount || 0).toFixed(2)}</Text>
+          {trip.spScStatus === 'pending' && trip.status === 'arrived' && (
+            <View style={styles.verificationBox}>
+              <Text style={styles.verificationTitle}>Check the passenger's valid SP/SC ID</Text>
+              <Text style={styles.verificationHint}>Apply the 20% fare discount only if the ID is valid.</Text>
+              <Pressable
+                style={[styles.verifyButton, verifyingSpSc && styles.actionButtonDisabled]}
+                onPress={() => verifySpSc(true)}
+                disabled={verifyingSpSc}
+              >
+                <Text style={styles.actionButtonText}>{verifyingSpSc ? 'Saving...' : 'Verify ID and apply discount'}</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.rejectButton, verifyingSpSc && styles.actionButtonDisabled]}
+                onPress={() => verifySpSc(false)}
+                disabled={verifyingSpSc}
+              >
+                <Text style={styles.rejectText}>ID not valid — keep regular fare</Text>
+              </Pressable>
+            </View>
+          )}
+          {trip.spScStatus === 'verified' && <Text style={styles.verificationSuccess}>SP/SC ID verified · 20% discount applied</Text>}
+          {trip.spScStatus === 'rejected' && <Text style={styles.verificationHint}>SP/SC ID was not verified · regular fare applies</Text>}
 
           {!!error && <Text style={styles.error}>{error}</Text>}
 
           {step && (
-            <Pressable style={[styles.actionButton, advancing && styles.actionButtonDisabled]} onPress={advance} disabled={advancing}>
+            <Pressable
+              style={[styles.actionButton, (advancing || (step.next === 'in_progress' && trip.spScStatus === 'pending')) && styles.actionButtonDisabled]}
+              onPress={advance}
+              disabled={advancing || (step.next === 'in_progress' && trip.spScStatus === 'pending')}
+            >
               {advancing ? <ActivityIndicator color="#fff" /> : <Text style={styles.actionButtonText}>{step.buttonText}</Text>}
             </Pressable>
           )}
@@ -148,6 +193,13 @@ const styles = StyleSheet.create({
   green: { color: colors.success },
   orange: { color: colors.brand },
   fare: { color: colors.brand, fontWeight: '900', fontSize: 17 },
+  verificationBox: { backgroundColor: '#FFF8E8', borderRadius: 12, padding: 12, marginTop: 12, gap: 8 },
+  verificationTitle: { color: '#744B00', fontWeight: '900', fontSize: 14 },
+  verificationHint: { color: '#8A5A00', fontSize: 12, lineHeight: 17, marginTop: 8 },
+  verificationSuccess: { color: colors.success, fontWeight: '800', marginTop: 10 },
+  verifyButton: { backgroundColor: colors.brand, borderRadius: 10, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  rejectButton: { backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: colors.border, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  rejectText: { color: colors.text, fontWeight: '800', fontSize: 13 },
   error: { color: colors.danger, fontSize: 12, marginTop: 10 },
   actionButton: { marginTop: 16, backgroundColor: colors.brand, borderRadius: 12, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   actionButtonDisabled: { opacity: 0.7 },

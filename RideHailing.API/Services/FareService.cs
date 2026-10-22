@@ -5,62 +5,38 @@ namespace RideHailing.API.Services;
 public interface IFareService
 {
     Task<FareEstimateResponse> EstimateAsync(FareEstimateRequest request);
-    Task<(decimal total, decimal baseFare, decimal distFare, decimal timeFare, decimal bookingFee, decimal surge)>
-        CalculateAsync(double distanceKm, int durationMinutes);
 }
 
 public class FareService(ISettingsService settings) : IFareService
 {
     public async Task<FareEstimateResponse> EstimateAsync(FareEstimateRequest req)
     {
+        if (!double.IsFinite(req.PickupLatitude) || req.PickupLatitude is < -90 or > 90 ||
+            !double.IsFinite(req.PickupLongitude) || req.PickupLongitude is < -180 or > 180 ||
+            !double.IsFinite(req.DropoffLatitude) || req.DropoffLatitude is < -90 or > 90 ||
+            !double.IsFinite(req.DropoffLongitude) || req.DropoffLongitude is < -180 or > 180)
+            throw new InvalidOperationException("Choose valid pickup and destination coordinates.");
+
+        var regularBaseFare = OfficialFareSchedule.GetRegularFare(
+            req.PickupZoneId, req.PickupPlaceId, req.DropoffZoneId, req.DropoffPlaceId,
+            req.PickupLatitude, req.PickupLongitude, req.DropoffLatitude, req.DropoffLongitude);
+        var discountedBaseFare = Math.Round(
+            regularBaseFare * (1m - OfficialFareSchedule.SpScDiscount), 2, MidpointRounding.AwayFromZero);
+        var bookingFee = await settings.GetDecimalAsync(SettingKeys.FareBookingFee, 5m);
         var distKm = HaversineKm(req.PickupLatitude, req.PickupLongitude,
                                  req.DropoffLatitude, req.DropoffLongitude);
-
-        // Estimate travel duration based on typical city traffic speeds
         var estimatedMinutes = (int)(distKm / 25.0 * 60);
-
-        var (total, baseFare, distFare, timeFare, bookingFee, surge) =
-            await CalculateAsync(distKm, estimatedMinutes);
-
         return new FareEstimateResponse(
-            BaseFare: baseFare,
-            EstimatedDistanceFare: distFare,
+            BaseFare: regularBaseFare,
+            EstimatedDistanceFare: 0m,
             BookingFee: bookingFee,
-            EstimatedTotal: total,
-            SurgeMultiplier: surge,
+            EstimatedTotal: regularBaseFare + bookingFee,
+            DiscountedBaseFare: req.SpScRequested ? discountedBaseFare : null,
+            DiscountedTotal: req.SpScRequested ? discountedBaseFare + bookingFee : null,
+            SpScRequested: req.SpScRequested,
+            SurgeMultiplier: 1.0m,
             EstimatedDistanceKm: Math.Round(distKm, 2),
             EstimatedMinutes: estimatedMinutes
-        );
-    }
-
-    public async Task<(decimal total, decimal baseFare, decimal distFare, decimal timeFare, decimal bookingFee, decimal surge)>
-        CalculateAsync(double distanceKm, int durationMinutes)
-    {
-        var baseFare   = await settings.GetDecimalAsync(SettingKeys.FareBase, 40m);
-        var perKm      = await settings.GetDecimalAsync(SettingKeys.FarePerKm, 12m);
-        var perMinute  = await settings.GetDecimalAsync(SettingKeys.FarePerMinute, 2.5m);
-        var minimum    = await settings.GetDecimalAsync(SettingKeys.FareMinimum, 80m);
-        var surgeOn    = await settings.GetBoolAsync(SettingKeys.SurgeEnabled, false);
-        var surgeMulti = await settings.GetDecimalAsync(SettingKeys.SurgeMultiplier, 1.0m);
-        var bookingFee = await settings.GetDecimalAsync(SettingKeys.FareBookingFee, 5m);
-
-        var distFare = (decimal)distanceKm * perKm;
-        var timeFare = durationMinutes * perMinute;
-        var surge    = surgeOn ? surgeMulti : 1.0m;
-
-        var subtotal = (baseFare + distFare + timeFare) * surge;
-        // Booking fee is a flat ancillary charge — per the BP's break-even
-        // analysis it's added on top regardless of trip length, and sits
-        // outside the minimum-fare floor and surge multiplier.
-        var total    = Math.Max(subtotal, minimum) + bookingFee;
-
-        return (
-            total:      Math.Round(total, 2),
-            baseFare:   Math.Round(baseFare, 2),
-            distFare:   Math.Round(distFare, 2),
-            timeFare:   Math.Round(timeFare, 2),
-            bookingFee: Math.Round(bookingFee, 2),
-            surge:      surge
         );
     }
 

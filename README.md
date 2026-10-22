@@ -85,7 +85,9 @@ BiyahePro - new/                                    ← Root Workspace Directory
 │   ├── 06_seed.sql                                ← Mock testing data
 │   ├── 07_refresh_tokens.sql                      ← JWT token management
 │   ├── 08_seed_admin.sql                          ← Admin account creation
-│   └── 10_add_booking_fee.sql                     ← Booking fee column addition
+│   ├── 10_add_booking_fee.sql                     ← Booking fee column addition
+│   ├── 15_official_zone_fares.sql                 ← Official fares & SP/SC verification fields
+│   └── 16_driver_location_monitoring.sql          ← Freshness timestamp for admin fleet map
 │
 └── RideHailing.API/                               ← Phase 2: ASP.NET Core Web API
     ├── Program.cs                                 ← Application entry & DI container
@@ -120,7 +122,8 @@ BiyahePro - new/                                    ← Root Workspace Directory
         ├── AuthService.cs                         ← Authentication & JWT generation
         ├── DriverService.cs                       ← Driver operations
         ├── TripService.cs                         ← Trip booking & dispatch
-        ├── FareService.cs                         ← Dynamic fare calculation
+        ├── FareService.cs                         ← Official zone fare calculation
+        ├── OfficialFareSchedule.cs                ← Ordinance destination fares and origins
         └── SettingsService.cs                     ← Configuration management
 ```
 
@@ -183,6 +186,10 @@ Then open:
 - Driver Expo server: port `8082`
 
 The API waits for the database health check before starting. The database initialization scripts in `ridehailing-db/` run automatically only when PostgreSQL initializes a new data directory. The scripts are mounted at `/docker-entrypoint-initdb.d` inside the database container and are executed in filename order.
+
+Official zone fares and driver-verified SP/SC discounts require `ridehailing-db/15_official_zone_fares.sql`. The admin Driver Location Map requires `ridehailing-db/16_driver_location_monitoring.sql`. On an existing database, apply both migrations manually; Docker does not rerun initialization scripts for an existing data directory. In Fare Pricing Management, the ordinance fare schedule and 20% SP/SC discount are fixed; admins can change the booking fee.
+
+The admin Driver Location Map refreshes current and last-known driver coordinates every 10 seconds. Driver coordinates are reported while the driver app is in the foreground and location permission is enabled, including when no ride is active. It displays the latest point only; it does not save or replay historical movement routes. Drivers are notified in the app that operations can see their live location while they use the app.
 
 ### How source code and data are mounted
 

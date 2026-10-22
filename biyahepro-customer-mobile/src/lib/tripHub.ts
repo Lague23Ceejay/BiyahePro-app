@@ -15,6 +15,8 @@ export type TripHubState = {
   status: string | null;
   driverId: string | null;
   driverLocation: DriverLocation | null;
+  fareAmount: number | null;
+  spScStatus: string | null;
   cancelled: boolean;
   connectionState: 'connecting' | 'connected' | 'disconnected';
 };
@@ -46,6 +48,8 @@ export function useTripUpdates(tripId: string | undefined, token: string | undef
     status: initialStatus ?? null,
     driverId: null,
     driverLocation: null,
+    fareAmount: null,
+    spScStatus: null,
     cancelled: false,
     connectionState: 'connecting',
   });
@@ -72,6 +76,11 @@ export function useTripUpdates(tripId: string | undefined, token: string | undef
       setState((prev) => ({ ...prev, status: 'cancelled', cancelled: true }));
     };
 
+    const onTripFareChanged = (payload: { tripId: string; fareAmount: number; spScStatus: string }) => {
+      if (payload.tripId !== tripId) return;
+      setState((prev) => ({ ...prev, fareAmount: payload.fareAmount, spScStatus: payload.spScStatus }));
+    };
+
     const onDriverLocationUpdated = (payload: { tripId?: string; latitude: number; longitude: number; driverId: string }) => {
       // The connection is shared across screens, so ignore pings that belong
       // to a different trip's room (the server includes tripId on each ping).
@@ -87,6 +96,7 @@ export function useTripUpdates(tripId: string | undefined, token: string | undef
     connection.on('TripAccepted', onTripAccepted);
     connection.on('TripStatusChanged', onTripStatusChanged);
     connection.on('TripCancelled', onTripCancelled);
+    connection.on('TripFareChanged', onTripFareChanged);
     connection.on('DriverLocationUpdated', onDriverLocationUpdated);
 
     const join = async () => {
@@ -116,6 +126,7 @@ export function useTripUpdates(tripId: string | undefined, token: string | undef
       connection.off('TripAccepted', onTripAccepted);
       connection.off('TripStatusChanged', onTripStatusChanged);
       connection.off('TripCancelled', onTripCancelled);
+      connection.off('TripFareChanged', onTripFareChanged);
       connection.off('DriverLocationUpdated', onDriverLocationUpdated);
       if (joinedRef.current) {
         connection.invoke('LeaveTripRoom', tripId).catch(() => {});

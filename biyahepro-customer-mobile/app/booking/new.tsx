@@ -16,14 +16,22 @@ import {
   View,
 } from 'react-native';
 import { LeafletMapPicker, type LeafletMapPickerHandle } from '@/src/components/LeafletMapPicker';
+import { ZonePlacePicker } from '@/src/components/ZonePlacePicker';
 import { AppButton } from '@/src/components/AppButton';
 import { AppInput } from '@/src/components/AppInput';
-import { api, getServiceArea, type ServiceArea } from '@/src/lib/api';
+import { api, getFareBookingFee, getServiceArea, type ServiceArea } from '@/src/lib/api';
 import { useAuth } from '@/src/context/AuthContext';
 import type { FareEstimate, BookTripRequest } from '@/src/types/api';
+import { MAP_ZONES, type FareZone, type ZonePlace } from '@/src/data/dapitanZones';
 import { colors } from '@/src/theme/colors';
 
-type Point = { latitude: number; longitude: number; address: string };
+type Point = {
+  latitude: number;
+  longitude: number;
+  address: string;
+  fareZoneId?: string;
+  farePlaceId?: string;
+};
 type MapTarget = 'pickup' | 'dropoff';
 
 const DEFAULT_PICKUP: Point = { latitude: 8.6555, longitude: 123.4243, address: '' };
@@ -41,6 +49,8 @@ export default function NewBookingScreen() {
   const { session } = useAuth();
   const mapRef = useRef<LeafletMapPickerHandle>(null);
   const scrollRef = useRef<ScrollView>(null);
+  const pointSelectionVersions = useRef({ pickup: 0, dropoff: 0 });
+  const estimateRequestId = useRef(0);
   // Toggled off for the duration of a touch that starts inside the map
   // card, so the WebView's own pan/zoom gesture gets the swipe instead of
   // the outer ScrollView also scrolling the whole page at the same time.
@@ -52,6 +62,8 @@ export default function NewBookingScreen() {
   const [locationLoading, setLocationLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
   const [isMapExpanded, setIsMapExpanded] = useState(false);
+  const [zonePickerOpen, setZonePickerOpen] = useState(false);
+  const [zonePickerZoneId, setZonePickerZoneId] = useState<string | null>(null);
   const [estimate, setEstimate] = useState<FareEstimate | null>(null);
   const [loading, setLoading] = useState(false);
   const [booking, setBooking] = useState(false);
@@ -67,15 +79,26 @@ export default function NewBookingScreen() {
   // typing could fire before the coordinates it depends on are ready.
   const [geocodingTarget, setGeocodingTarget] = useState<MapTarget | null>(null);
   const [serviceArea, setServiceArea] = useState<ServiceArea | undefined>();
+  const [bookingFee, setBookingFee] = useState<number | null>(null);
+  const [bookingFeeError, setBookingFeeError] = useState('');
+  const [spScRequested, setSpScRequested] = useState(false);
 
   const activePoint = target === 'pickup' ? pickup : dropoff;
   const hasAddresses = Boolean(pickup.address.trim() && dropoff.address.trim());
+  const hasOfficialRoute = Boolean(
+    pickup.fareZoneId && pickup.farePlaceId && dropoff.fareZoneId && dropoff.farePlaceId,
+  );
 
   useEffect(() => {
     loadCurrentLocation();
     let mounted = true;
     const refreshServiceArea = () => getServiceArea().then(area => { if (mounted) setServiceArea(area); }).catch(() => undefined);
     refreshServiceArea();
+    getFareBookingFee()
+      .then(fee => { if (mounted) { setBookingFee(fee); setBookingFeeError(''); } })
+      .catch((e: unknown) => {
+        if (mounted) setBookingFeeError(e instanceof Error ? e.message : 'Unable to load the current booking fee.');
+      });
     const timer = setInterval(refreshServiceArea, 15000);
     return () => { mounted = false; clearInterval(timer); };
   }, []);
@@ -90,6 +113,7 @@ export default function NewBookingScreen() {
   }
 
   async function loadCurrentLocation() {
+    const selectionVersion = ++pointSelectionVersions.current.pickup;
     setLocationLoading(true);
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
@@ -104,7 +128,9 @@ export default function NewBookingScreen() {
         longitude: current.coords.longitude,
         address: await reverseGeocode(current.coords.latitude, current.coords.longitude),
       };
+      if (selectionVersion !== pointSelectionVersions.current.pickup) return;
       setPickup(point);
+      invalidateEstimate();
       setCenter(point);
       mapRef.current?.flyTo(point, 16);
     } catch {
@@ -116,11 +142,14 @@ export default function NewBookingScreen() {
 
   async function selectPoint(latitude: number, longitude: number) {
     setError('');
+    const pointTarget = target;
+    const selectionVersion = ++pointSelectionVersions.current[pointTarget];
     const address = await reverseGeocode(latitude, longitude);
+    if (selectionVersion !== pointSelectionVersions.current[pointTarget]) return;
     const point = { latitude, longitude, address };
-    if (target === 'pickup') setPickup(point);
+    if (pointTarget === 'pickup') setPickup(point);
     else setDropoff(point);
-    setEstimate(null);
+    invalidateEstimate();
   }
 
   function focusPoint(point: Point) {
@@ -128,10 +157,37 @@ export default function NewBookingScreen() {
     mapRef.current?.flyTo(point, 16);
   }
 
+  function openZonePicker(zoneId: string | null) {
+    // Two Modals can't be shown at once on iOS, so leave fullscreen-map mode first.
+    setIsMapExpanded(false);
+    setZonePickerZoneId(zoneId);
+    setZonePickerOpen(true);
+  }
+
+  // A place chosen from the zone picker becomes the active pickup/destination.
+  function applyZonePlace(zone: FareZone, place: ZonePlace) {
+    const pointTarget = target;
+    pointSelectionVersions.current[pointTarget] += 1;
+    const point: Point = {
+      latitude: place.latitude,
+      longitude: place.longitude,
+      address: zone.id === 'zone-1' ? 'Dapitan Island Poblacion' : `${place.name}, Dapitan City`,
+      fareZoneId: zone.id,
+      farePlaceId: place.id,
+    };
+    setError('');
+    if (pointTarget === 'pickup') setPickup(point);
+    else setDropoff(point);
+    invalidateEstimate();
+    setZonePickerOpen(false);
+    focusPoint(point);
+  }
+
   function setAddress(targetPoint: MapTarget, value: string) {
-    setEstimate(null);
-    if (targetPoint === 'pickup') setPickup((p) => ({ ...p, address: value }));
-    else setDropoff((p) => ({ ...p, address: value }));
+    pointSelectionVersions.current[targetPoint] += 1;
+    invalidateEstimate();
+    if (targetPoint === 'pickup') setPickup((p) => ({ ...p, address: value, fareZoneId: undefined, farePlaceId: undefined }));
+    else setDropoff((p) => ({ ...p, address: value, fareZoneId: undefined, farePlaceId: undefined }));
   }
 
   function openSchedulePicker() {
@@ -174,6 +230,7 @@ export default function NewBookingScreen() {
     const trimmed = address.trim();
     if (!trimmed) return;
 
+    const selectionVersion = ++pointSelectionVersions.current[targetPoint];
     setGeocodingTarget(targetPoint);
     setError('');
     try {
@@ -183,10 +240,11 @@ export default function NewBookingScreen() {
         setError(`Couldn't find a location for "${trimmed}". Try a more specific address, or tap the map instead.`);
         return;
       }
+      if (selectionVersion !== pointSelectionVersions.current[targetPoint]) return;
       const point = { latitude: hit.latitude, longitude: hit.longitude, address: trimmed };
       if (targetPoint === 'pickup') setPickup(point);
       else setDropoff(point);
-      setEstimate(null);
+      invalidateEstimate();
       if (target === targetPoint) focusPoint(point);
     } catch {
       setError('Address lookup failed. Please check your connection, or tap the map instead.');
@@ -200,7 +258,17 @@ export default function NewBookingScreen() {
     pickupLongitude: pickup.longitude,
     dropoffLatitude: dropoff.latitude,
     dropoffLongitude: dropoff.longitude,
+    pickupZoneId: pickup.fareZoneId,
+    pickupPlaceId: pickup.farePlaceId,
+    dropoffZoneId: dropoff.fareZoneId,
+    dropoffPlaceId: dropoff.farePlaceId,
   }), [pickup, dropoff]);
+
+  function invalidateEstimate() {
+    estimateRequestId.current += 1;
+    setEstimate(null);
+    setLoading(false);
+  }
 
   async function getEstimate() {
     setError('');
@@ -208,14 +276,24 @@ export default function NewBookingScreen() {
       setError('Please provide both pickup and destination addresses.');
       return;
     }
+    if (!hasOfficialRoute) {
+      setError('Choose pickup and destination from the official fare-zone list. Unlisted routes cannot be booked at an official fare.');
+      return;
+    }
+    const requestId = ++estimateRequestId.current;
     setLoading(true);
     setEstimate(null);
     try {
-      setEstimate(await api.estimateFare(coordinates));
+      const nextEstimate = await api.estimateFare({ ...coordinates, spScRequested });
+      if (requestId !== estimateRequestId.current) return;
+      setEstimate(nextEstimate);
+      setBookingFee(nextEstimate.bookingFee);
+      setBookingFeeError('');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to estimate fare.');
+      if (requestId === estimateRequestId.current)
+        setError(e instanceof Error ? e.message : 'Unable to estimate fare.');
     } finally {
-      setLoading(false);
+      if (requestId === estimateRequestId.current) setLoading(false);
     }
   }
 
@@ -247,6 +325,7 @@ export default function NewBookingScreen() {
         dropoffAddress: dropoff.address.trim(),
         paymentMethod,
         vehicleType,
+        spScRequested,
         scheduledFor: rideTiming === 'later' && scheduledFor ? scheduledFor.toISOString() : null,
       }, session.accessToken);
 
@@ -266,22 +345,24 @@ export default function NewBookingScreen() {
     }
   }
 
-  // Shared between the inline map card and the fullscreen Modal so the
-  // marker/tap/location logic only has to live in one place. `expanded`
-  // only changes the expand/collapse button shown in the top-right corner.
+  // Shared by the inline map card and the fullscreen Modal. `expanded` only
+  // changes which icon the corner button shows.
   function renderMapContent(expanded: boolean) {
     return (
       <>
         <LeafletMapPicker
           key={serviceArea ? `${serviceArea.latitude}-${serviceArea.longitude}-${serviceArea.radiusKm}` : 'default-service-area'}
           ref={mapRef}
-          initialCenter={serviceArea || center}
+          initialCenter={center}
           initialZoom={15}
           pickup={pickup}
           dropoff={dropoff}
           onMapPress={(point) => selectPoint(point.latitude, point.longitude)}
           onReady={() => setMapReady(true)}
           serviceArea={serviceArea}
+          zones={MAP_ZONES}
+          // Tapping a "Zone N" label zooms to that zone and opens its place list.
+          onZonePress={(zoneId) => { mapRef.current?.focusZone(zoneId); openZonePicker(zoneId); }}
         />
         <View style={styles.mapOverlay} pointerEvents="none">
           <Text style={styles.mapHint}>Tap anywhere to place the {target === 'pickup' ? 'pickup' : 'destination'} pin.</Text>
@@ -292,11 +373,7 @@ export default function NewBookingScreen() {
             <Text style={styles.locationButtonText}>Use my location</Text>
           </Pressable>
         </View>
-        <Pressable
-          style={styles.expandButton}
-          onPress={() => setIsMapExpanded(!expanded)}
-          hitSlop={10}
-        >
+        <Pressable style={styles.expandButton} onPress={() => setIsMapExpanded(!expanded)} hitSlop={10}>
           <Text style={styles.expandIcon}>{expanded ? '⤬' : '⛶'}</Text>
         </Pressable>
         {!mapReady && <View style={styles.mapLoading}><ActivityIndicator color={colors.brand} /><Text style={styles.mapLoadingText}>Loading map…</Text></View>}
@@ -328,18 +405,10 @@ export default function NewBookingScreen() {
           </View>
         )}
 
-        {/* Fullscreen mode — same map content, rendered inside a Modal instead
-            of the fixed-height card. Only one of the two is ever mounted at
-            once, so there's no duplicate WebView instance or ref collision;
-            switching back just re-mounts the inline card version. */}
-        <Modal
-          visible={isMapExpanded}
-          animationType="slide"
-          onRequestClose={() => setIsMapExpanded(false)}
-        >
-          <View style={styles.fullscreenMapCard}>
-            {renderMapContent(true)}
-          </View>
+        {/* Fullscreen mode: the same map content inside a Modal. Only one of
+            the two is ever mounted, so there is one WebView and one ref. */}
+        <Modal visible={isMapExpanded} animationType="slide" onRequestClose={() => setIsMapExpanded(false)}>
+          <View style={styles.fullscreenMapCard}>{isMapExpanded ? renderMapContent(true) : null}</View>
         </Modal>
 
         <View style={styles.selectorRow}>
@@ -352,6 +421,27 @@ export default function NewBookingScreen() {
             <View style={styles.selectorText}><Text style={styles.selectorLabel}>DESTINATION</Text><Text numberOfLines={1} style={styles.selectorValue}>{dropoff.address || 'Choose destination'}</Text></View>
           </Pressable>
         </View>
+
+        <Pressable style={styles.zoneButton} onPress={() => openZonePicker(null)}>
+          <Text style={styles.zoneButtonText}>Choose {target === 'pickup' ? 'pickup' : 'destination'} by zone · see fares</Text>
+          <Text style={styles.zoneButtonChevron}>›</Text>
+        </Pressable>
+        {!!bookingFeeError && <Text style={styles.geocodingHint}>{bookingFeeError} The fare estimate will show the configured fee.</Text>}
+
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: spScRequested }}
+          style={[styles.spScOption, spScRequested && styles.spScOptionSelected]}
+          onPress={() => { setSpScRequested(!spScRequested); invalidateEstimate(); }}
+        >
+          <View style={[styles.spScCheckbox, spScRequested && styles.spScCheckboxSelected]}>
+            {spScRequested && <Text style={styles.spScCheck}>✓</Text>}
+          </View>
+          <View style={styles.spScText}>
+            <Text style={styles.spScTitle}>Request SP/SC discount</Text>
+            <Text style={styles.spScHint}>A valid ID must be checked by your driver at pickup. The discount applies only after verification.</Text>
+          </View>
+        </Pressable>
 
         <AppInput
           label="Pickup address"
@@ -443,13 +533,29 @@ export default function NewBookingScreen() {
             <View style={styles.estimateHeader}><Text style={styles.estimateTitle}>Your trip estimate</Text><Text style={styles.paymentBadge}>{paymentMethod.toUpperCase()}</Text></View>
             <View style={styles.priceRow}><Text style={styles.muted}>Distance</Text><Text style={styles.value}>{estimate.estimatedDistanceKm.toFixed(1)} km</Text></View>
             <View style={styles.priceRow}><Text style={styles.muted}>Estimated time</Text><Text style={styles.value}>{estimate.estimatedMinutes} min</Text></View>
-            <View style={styles.priceRow}><Text style={styles.muted}>Base fare</Text><Text style={styles.value}>₱{Number(estimate.baseFare).toFixed(2)}</Text></View>
+            <View style={styles.priceRow}><Text style={styles.muted}>Regular base fare</Text><Text style={styles.value}>₱{Number(estimate.baseFare).toFixed(2)}</Text></View>
+            {spScRequested && estimate.discountedBaseFare != null && (
+              <View style={styles.priceRow}><Text style={styles.muted}>SP/SC base fare if verified</Text><Text style={styles.value}>₱{Number(estimate.discountedBaseFare).toFixed(2)}</Text></View>
+            )}
             <View style={styles.priceRow}><Text style={styles.muted}>Booking fee</Text><Text style={styles.value}>₱{Number(estimate.bookingFee).toFixed(2)}</Text></View>
-            <View style={[styles.priceRow, styles.total]}><Text style={styles.totalLabel}>Estimated total</Text><Text style={styles.totalValue}>₱{Number(estimate.estimatedTotal).toFixed(2)}</Text></View>
+            <View style={[styles.priceRow, styles.total]}><Text style={styles.totalLabel}>{spScRequested ? 'Total before ID verification' : 'Estimated total'}</Text><Text style={styles.totalValue}>₱{Number(estimate.estimatedTotal).toFixed(2)}</Text></View>
+            {spScRequested && estimate.discountedTotal != null && (
+              <View style={styles.priceRow}><Text style={styles.muted}>SP/SC total if driver verifies ID</Text><Text style={styles.value}>₱{Number(estimate.discountedTotal).toFixed(2)}</Text></View>
+            )}
             <AppButton title={rideTiming === 'later' ? 'Schedule ride' : 'Confirm ride'} onPress={confirmBooking} loading={booking} />
           </View>
         )}
       </ScrollView>
+      <ZonePlacePicker
+        visible={zonePickerOpen}
+        target={target}
+        initialZoneId={zonePickerZoneId}
+        pickup={pickup}
+        dropoff={dropoff}
+        bookingFee={bookingFee}
+        onClose={() => setZonePickerOpen(false)}
+        onSelect={applyZonePlace}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -460,12 +566,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '900', color: colors.text },
   subtitle: { marginTop: 3, color: colors.muted },
   mapCard: { height: 330, borderRadius: 22, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, position: 'relative' },
-  fullscreenMapCard: { flex: 1, backgroundColor: colors.surface, position: 'relative' },
-  expandButton: {
-    position: 'absolute', top: 14, right: 14, width: 38, height: 38, borderRadius: 19,
-    backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center',
-  },
-  expandIcon: { color: '#fff', fontSize: 18 },
   map: { ...StyleSheet.absoluteFill },
   mapOverlay: { position: 'absolute', top: 12, left: 12, right: 12, alignItems: 'center' },
   mapHint: { backgroundColor: 'rgba(255,255,255,0.94)', color: colors.text, fontSize: 12, fontWeight: '700', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16, overflow: 'hidden' },
@@ -474,6 +574,26 @@ const styles = StyleSheet.create({
   locationIcon: { color: colors.brand, fontSize: 20, fontWeight: '900' },
   locationButtonText: { color: colors.text, fontWeight: '800', fontSize: 12 },
   disabled: { opacity: 0.65 },
+  fullscreenMapCard: { flex: 1, backgroundColor: colors.surface, position: 'relative' },
+  expandButton: {
+    position: 'absolute', top: 14, right: 14, width: 38, height: 38, borderRadius: 19,
+    backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center',
+  },
+  expandIcon: { color: '#fff', fontSize: 18 },
+  zoneButton: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14,
+    backgroundColor: colors.brandSoft, borderRadius: 14, borderWidth: 1, borderColor: colors.brand,
+  },
+  zoneButtonText: { color: colors.brand, fontWeight: '800', fontSize: 14 },
+  zoneButtonChevron: { color: colors.brand, fontSize: 22 },
+  spScOption: { flexDirection: 'row', alignItems: 'flex-start', gap: 11, padding: 13, borderRadius: 14, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  spScOptionSelected: { borderColor: colors.brand, backgroundColor: colors.brandSoft },
+  spScCheckbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: colors.muted, alignItems: 'center', justifyContent: 'center' },
+  spScCheckboxSelected: { borderColor: colors.brand, backgroundColor: colors.brand },
+  spScCheck: { color: '#fff', fontWeight: '900', fontSize: 14 },
+  spScText: { flex: 1 },
+  spScTitle: { color: colors.text, fontWeight: '800' },
+  spScHint: { color: colors.muted, fontSize: 12, lineHeight: 17, marginTop: 3 },
   mapLoading: { ...StyleSheet.absoluteFill, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', gap: 8 },
   mapLoadingText: { color: colors.muted },
   selectorRow: { gap: 8 },

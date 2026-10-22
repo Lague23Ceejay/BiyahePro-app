@@ -26,13 +26,15 @@ public class Trip
     // requested → accepted → en_route → arrived → in_progress → completed | cancelled
     public string   Status           { get; set; } = "requested";
 
-    // ── Fare snapshot (locked at booking time) ────────────────
+    // ── Fare snapshot; a requested SP/SC discount is finalized at pickup ─
+    public decimal  RegularBaseFare  { get; set; }
     public decimal  BaseFare         { get; set; }
     public decimal  DistanceFare     { get; set; }
     public decimal  TimeFare         { get; set; }
     public decimal  SurgeMultiplier  { get; set; } = 1.00m;
     public decimal  BookingFee       { get; set; }   // flat ancillary fee (fare.booking_fee setting)
     public decimal  FareAmount       { get; set; }   // final total, includes BookingFee
+    public string   SpScStatus       { get; set; } = "not_requested";
 
     // ── Trip metrics (filled on completion) ──────────────────
     public decimal? DistanceKm       { get; set; }
@@ -85,20 +87,32 @@ public record BookTripRequest(
     string DropoffAddress,
     string PaymentMethod = "cash",
     DateTime? ScheduledFor = null,
-    string VehicleType = "motorcycle"
+    string VehicleType = "motorcycle",
+    string? PickupZoneId = null,
+    string? PickupPlaceId = null,
+    string? DropoffZoneId = null,
+    string? DropoffPlaceId = null,
+    bool SpScRequested = false
 );
 
 public record FareEstimateRequest(
     double PickupLatitude,
     double PickupLongitude,
     double DropoffLatitude,
-    double DropoffLongitude
+    double DropoffLongitude,
+    string? PickupZoneId = null,
+    string? PickupPlaceId = null,
+    string? DropoffZoneId = null,
+    string? DropoffPlaceId = null,
+    bool SpScRequested = false
 );
 
 public record TripStatusUpdate(
     Guid   TripId,
     string Status
 );
+
+public record SpScVerificationRequest(bool Eligible);
 
 // ── Ratings (BP §III step 7 "Rating & Feedback System") ────────
 public record RateTripRequest(
@@ -112,6 +126,9 @@ public record FareEstimateResponse(
     decimal EstimatedDistanceFare,
     decimal BookingFee,
     decimal EstimatedTotal,
+    decimal? DiscountedBaseFare,
+    decimal? DiscountedTotal,
+    bool SpScRequested,
     decimal SurgeMultiplier,
     double  EstimatedDistanceKm,
     int     EstimatedMinutes
@@ -143,6 +160,7 @@ public record PendingTripResponse
     public string PickupAddress { get; init; } = "";
     public string DropoffAddress { get; init; } = "";
     public decimal FareAmount { get; init; }
+    public string SpScStatus { get; init; } = "not_requested";
     public decimal DistanceKm { get; init; }
     public string CustomerName { get; init; } = "";
     public DateTime RequestedAt { get; init; }

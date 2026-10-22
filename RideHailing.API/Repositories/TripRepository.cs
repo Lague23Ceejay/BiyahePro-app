@@ -26,7 +26,7 @@ public class TripRepository(IConfiguration config) : ITripRepository
 {
     using var db = Connection();
     var sql = $@"
-        SELECT t.id, t.pickup_address, t.dropoff_address, t.fare_amount,
+        SELECT t.id, t.pickup_address, t.dropoff_address, t.fare_amount, t.sp_sc_status,
             t.requested_at,
             uc.full_name AS customer_name,
             ROUND((ST_Distance(t.pickup_location, ST_SetSRID(ST_MakePoint(@Lng, @Lat), 4326)::geography) / 1000)::numeric, 2) AS distance_km
@@ -70,7 +70,7 @@ public class TripRepository(IConfiguration config) : ITripRepository
     private const string TripColumns = @"
         t.id, t.customer_id, t.driver_id, t.pickup_address, t.dropoff_address,
         t.status, t.vehicle_type, t.scheduled_for,
-        t.base_fare, t.distance_fare, t.time_fare, t.surge_multiplier, t.booking_fee, t.fare_amount,
+        t.regular_base_fare, t.base_fare, t.distance_fare, t.time_fare, t.surge_multiplier, t.booking_fee, t.fare_amount, t.sp_sc_status,
         t.distance_km, t.duration_minutes,
         t.payment_method, t.payment_status,
         t.cancelled_by, t.cancel_reason,
@@ -81,7 +81,7 @@ public class TripRepository(IConfiguration config) : ITripRepository
     private const string TripColumnsUnaliased = @"
         id, customer_id, driver_id, pickup_address, dropoff_address,
         status, vehicle_type, scheduled_for,
-        base_fare, distance_fare, time_fare, surge_multiplier, booking_fee, fare_amount,
+        regular_base_fare, base_fare, distance_fare, time_fare, surge_multiplier, booking_fee, fare_amount, sp_sc_status,
         distance_km, duration_minutes,
         payment_method, payment_status,
         cancelled_by, cancel_reason,
@@ -94,13 +94,13 @@ public class TripRepository(IConfiguration config) : ITripRepository
             INSERT INTO trips (
                 customer_id, pickup_location, dropoff_location,
                 pickup_address, dropoff_address, payment_method,
-                base_fare, distance_fare, surge_multiplier, booking_fee, fare_amount, status, scheduled_for, vehicle_type
+                regular_base_fare, base_fare, distance_fare, surge_multiplier, booking_fee, fare_amount, sp_sc_status, status, scheduled_for, vehicle_type
             ) VALUES (
                 @CustomerId,
                 ST_SetSRID(ST_MakePoint(@PickupLongitude, @PickupLatitude), 4326)::geography,
                 ST_SetSRID(ST_MakePoint(@DropoffLongitude, @DropoffLatitude), 4326)::geography,
                 @PickupAddress, @DropoffAddress, @PaymentMethod,
-                @BaseFare, @DistanceFare, @SurgeMultiplier, @BookingFee, @FareAmount, @Status, @ScheduledFor, @VehicleType
+                @RegularBaseFare, @BaseFare, @DistanceFare, @SurgeMultiplier, @BookingFee, @FareAmount, @SpScStatus, @Status, @ScheduledFor, @VehicleType
             )
             RETURNING {TripColumnsUnaliased}, {LatLngSelectExpr}";
         return await db.QuerySingleAsync<Trip>(sql, trip);
@@ -140,7 +140,10 @@ public class TripRepository(IConfiguration config) : ITripRepository
                 payment_status = @PaymentStatus,
                 cancelled_by   = @CancelledBy,
                 cancel_reason  = @CancelReason,
+                regular_base_fare = @RegularBaseFare,
+                base_fare      = @BaseFare,
                 fare_amount    = @FareAmount,
+                sp_sc_status   = @SpScStatus,
                 accepted_at    = @AcceptedAt,
                 en_route_at    = @EnRouteAt,
                 arrived_at     = @ArrivedAt,

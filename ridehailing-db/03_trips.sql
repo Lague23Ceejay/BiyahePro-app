@@ -40,13 +40,16 @@ CREATE TABLE IF NOT EXISTS trips (
     -- sweep flips status 'scheduled' -> 'requested' once this arrives.
     scheduled_for       TIMESTAMPTZ,
 
-    -- Fare breakdown (all from app_settings at time of booking)
+    -- Official fare schedule snapshot and the booking fee at request time
+    regular_base_fare  NUMERIC(10,2) NOT NULL DEFAULT 0,
     base_fare           NUMERIC(10,2) NOT NULL DEFAULT 0,
     distance_fare       NUMERIC(10,2) NOT NULL DEFAULT 0,
     time_fare           NUMERIC(10,2) NOT NULL DEFAULT 0,
     surge_multiplier    NUMERIC(4,2) NOT NULL DEFAULT 1.00,
     booking_fee         NUMERIC(10,2) NOT NULL DEFAULT 0,   -- flat ancillary fee (see fare.booking_fee setting)
     fare_amount         NUMERIC(10,2) NOT NULL DEFAULT 0,   -- final total, includes booking_fee
+    sp_sc_status        TEXT NOT NULL DEFAULT 'not_requested'
+                                    CHECK (sp_sc_status IN ('not_requested', 'pending', 'verified', 'rejected')),
 
     -- Distance and duration
     distance_km         NUMERIC(8,2),

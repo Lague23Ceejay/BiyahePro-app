@@ -1,13 +1,22 @@
 // File path in project: ridehailing-client/src/components/admin/AdminDashboard.jsx
 import { useState, useEffect } from 'react';
-import { Shield, Settings, CreditCard, LogOut, Car, Users, UserCog, LayoutDashboard, BarChart3 } from 'lucide-react';
+import { Shield, Settings, CreditCard, LogOut, Car, Users, UserCog, LayoutDashboard, BarChart3, MapPin } from 'lucide-react';
 import LiveTrips from './LiveTrips';
 import AuditLogs from './AuditLogs';
 import DriversPanel from './DriversPanel';
 import UsersPanel from './UsersPanel';
 import OverviewPanel from './OverviewPanel';
+import FleetTrackingPanel from './FleetTrackingPanel';
 import LeafletMap from './LeafletMap';
 import { apiFetch } from '../../lib/api';
+
+const OFFICIAL_FARE_ZONES = [
+  { zone: 'Zone 1', origin: 'Within Poblacion', rows: [['Within Dapitan Island Poblacion', 15]] },
+  { zone: 'Zone 2', origin: 'Poblacion / Polo', rows: [['Polo', 20], ['Sulangon', 15], ['Oyan', 22], ['Burgos', 30], ['Ilaya', 35], ['Barcelona', 40], ['Opao', 45], ['Potungan', 50], ['Dampalan', 60]] },
+  { zone: 'Zone 3', origin: 'Polo', rows: [['San Pedro', 12], ['San Vicente', 20], ['Owaon', 20], ['Liyang', 20], ['Larayan', 26]] },
+  { zone: 'Zone 4', origin: 'Poblacion', rows: [['Talisay', 16], ['Sto. Niño', 20], ['Taquilon', 35], ['Canlucan', 60], ['Tag-ulo', 60], ['Guimputlan (₱60 fare listing)', 60], ['Guimputlan (₱70 fare listing)', 70], ['Banganan', 60], ['Carang', 40]] },
+  { zone: 'Zone 5 & 6', origin: 'Poblacion', rows: [['Binonoc', 20], ['Oro', 30], ['Napo', 40], ['Baylimango', 40], ['Kauswagan', 40], ['Daro', 60]] },
+];
 
 export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -50,16 +59,36 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
     e.preventDefault();
     setSaveError('');
     try {
-      for (const [key, value] of Object.entries(settings)) {
-        await apiFetch(`/api/settings/${key}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ value: value })
-        });
-      }
-      alert('Parameters successfully committed to PostgreSQL database! Audit logs created.');
+      const response = await apiFetch('/api/settings/ops.driver_search_radius_km', {
+        method: 'PATCH',
+        body: JSON.stringify({ value: settings['ops.driver_search_radius_km'] }),
+      });
+      if (!response.ok) throw new Error('Unable to save the driver search radius.');
+      alert('Driver search radius successfully saved.');
     } catch (error) {
       if (error.isAuthError) { onAuthError(); return; }
       setSaveError('Error updating database settings.');
+    }
+  };
+
+  const handleSaveFareSettings = async (e) => {
+    e.preventDefault();
+    setSaveError('');
+    const bookingFee = Number(settings['fare.booking_fee']);
+    if (!Number.isFinite(bookingFee) || bookingFee < 0) {
+      setSaveError('Enter a valid booking fee of zero or more.');
+      return;
+    }
+    try {
+      const response = await apiFetch('/api/settings/fare.booking_fee', {
+        method: 'PATCH',
+        body: JSON.stringify({ value: bookingFee.toFixed(2) }),
+      });
+      if (!response.ok) throw new Error('Unable to save the booking fee.');
+      alert('Booking fee successfully saved.');
+    } catch (error) {
+      if (error.isAuthError) { onAuthError(); return; }
+      setSaveError(error instanceof Error ? error.message : 'Error updating the booking fee.');
     }
   };
 
@@ -156,6 +185,15 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
             </button>
             <button
               type="button"
+              onClick={() => setActiveTab('fleet-map')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition ${
+                activeTab === 'fleet-map' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/10' : 'text-slate-400 hover:bg-slate-800'
+              }`}
+            >
+              <MapPin className="w-4 h-4" /> Driver Location Map
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveTab('audit')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition ${
                 activeTab === 'audit' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/10' : 'text-slate-400 hover:bg-slate-800'
@@ -182,6 +220,7 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
         {activeTab === 'trips' && <LiveTrips onAuthError={onAuthError} />}
         {activeTab === 'analytics' && <OverviewPanel onAuthError={onAuthError} />}
         {activeTab === 'drivers' && <DriversPanel onAuthError={onAuthError} />}
+        {activeTab === 'fleet-map' && <FleetTrackingPanel onAuthError={onAuthError} />}
         {activeTab === 'audit' && <AuditLogs onAuthError={onAuthError} />}
         {(activeTab === 'general' || activeTab === 'fares') && (
           <div className="mb-6 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
@@ -216,8 +255,8 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
             </div>
           </div>
         )}
-        {(activeTab !== 'general' && activeTab !== 'fares' && activeTab !== 'dashboard' && activeTab !== 'users' && activeTab !== 'trips' && activeTab !== 'analytics' && activeTab !== 'drivers' && activeTab !== 'audit') && <p className="text-slate-400">Select an admin section.</p>}
-        {activeTab !== 'general' && activeTab !== 'fares' && activeTab !== 'dashboard' && activeTab !== 'users' && activeTab !== 'trips' && activeTab !== 'analytics' && activeTab !== 'drivers' && activeTab !== 'audit' ? null : null}
+        {(activeTab !== 'general' && activeTab !== 'fares' && activeTab !== 'dashboard' && activeTab !== 'users' && activeTab !== 'trips' && activeTab !== 'analytics' && activeTab !== 'drivers' && activeTab !== 'fleet-map' && activeTab !== 'audit') && <p className="text-slate-400">Select an admin section.</p>}
+        {activeTab !== 'general' && activeTab !== 'fares' && activeTab !== 'dashboard' && activeTab !== 'users' && activeTab !== 'trips' && activeTab !== 'analytics' && activeTab !== 'drivers' && activeTab !== 'fleet-map' && activeTab !== 'audit' ? null : null}
         {activeTab !== 'general' && activeTab !== 'fares' ? null : (
         <>
         {(activeTab === 'general' || activeTab === 'fares') && loading ? (
@@ -244,16 +283,11 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold uppercase text-slate-400 tracking-wider mb-2">
-                      Surge Pricing Mode Toggle
+                      Fare Calculation
                     </label>
-                    <select
-                      value={settings['surge.enabled'] || 'false'}
-                      onChange={(e) => handleSettingChange('surge.enabled', e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-amber-500 focus:outline-none transition"
-                    >
-                      <option value="false">Disabled (Standard Rates)</option>
-                      <option value="true">Active (Apply Surge Multipliers)</option>
-                    </select>
+                    <p className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-300">
+                      Official zone fares apply. Surge multipliers do not change ordinance fares.
+                    </p>
                   </div>
                 </div>
                 <button type="submit" className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6 py-3 rounded-xl transition text-sm">
@@ -263,55 +297,61 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
             )}
 
             {activeTab === 'fares' && (
-              <form onSubmit={handleSaveSettings} className="max-w-xl space-y-6">
+              <form onSubmit={handleSaveFareSettings} className="max-w-5xl space-y-6">
                 <header className="mb-8">
-                  <h1 className="text-2xl font-bold tracking-tight">Fare Pricing Management</h1>
-                  <p className="text-slate-400 text-sm mt-1">Adjust active ride metrics formulas</p>
+                  <h1 className="text-2xl font-bold tracking-tight">Official Zone Fare Schedule</h1>
+                  <p className="text-slate-400 text-sm mt-1">Official base fares for listed routes. SP/SC receives 20% off the base fare after the driver verifies a valid ID.</p>
                 </header>
                 <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold uppercase text-slate-400 tracking-wider mb-2">
-                        Base Fare Flagfall (PHP)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={settings['fare.base_amount'] || '40.00'}
-                        onChange={(e) => handleSettingChange('fare.base_amount', e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-amber-500 focus:outline-none transition"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold uppercase text-slate-400 tracking-wider mb-2">
-                        Minimum Fare Cutoff (PHP)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={settings['fare.minimum'] || '80.00'}
-                        onChange={(e) => handleSettingChange('fare.minimum', e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-amber-500 focus:outline-none transition"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold uppercase text-slate-400 tracking-wider mb-2">
-                        Booking Fee (PHP)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={settings['fare.booking_fee'] || '5.00'}
-                        onChange={(e) => handleSettingChange('fare.booking_fee', e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-amber-500 focus:outline-none transition"
-                      />
-                      <p className="text-xs text-slate-500 mt-1">Flat ancillary fee added to every ride — drives the ₱153/mo break-even target.</p>
-                    </div>
+                  <div className="max-h-[55vh] overflow-auto rounded-xl border border-slate-800">
+                    <table className="w-full min-w-[680px] text-left text-xs">
+                      <thead className="sticky top-0 bg-slate-950 text-slate-400">
+                        <tr>
+                          <th className="p-3">Destination / Origin</th>
+                          <th className="p-3 text-right">Regular base</th>
+                          <th className="p-3 text-right">SP/SC base</th>
+                          <th className="p-3 text-right">SP/SC total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {OFFICIAL_FARE_ZONES.flatMap(group => [
+                          <tr key={`${group.zone}-heading`} className="bg-slate-800/70 text-amber-300">
+                            <th colSpan="4" className="px-3 py-2 text-left">{group.zone} · Origin: {group.origin}</th>
+                          </tr>,
+                          ...group.rows.map(([name, regularFare]) => {
+                            const discountedBase = Number(regularFare) * 0.8;
+                            const bookingFee = Number(settings['fare.booking_fee'] || '5.00');
+                            return (
+                              <tr key={`${group.zone}-${name}`} className="border-t border-slate-800 text-slate-200">
+                                <td className="p-3">{name}</td>
+                                <td className="p-3 text-right">₱{Number(regularFare).toFixed(2)}</td>
+                                <td className="p-3 text-right">₱{discountedBase.toFixed(2)}</td>
+                                <td className="p-3 text-right font-semibold">₱{(discountedBase + bookingFee).toFixed(2)}</td>
+                              </tr>
+                            );
+                          })
+                        ])}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="max-w-xs">
+                    <label className="block text-xs font-semibold uppercase text-slate-400 tracking-wider mb-2">
+                      Booking Fee (PHP)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={settings['fare.booking_fee'] || '5.00'}
+                      onChange={(e) => handleSettingChange('fare.booking_fee', e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm focus:border-amber-500 focus:outline-none transition"
+                    />
+                    <p className="text-xs text-slate-500 mt-1">Added to the fare. SP/SC discount applies to the base fare only.</p>
                   </div>
                 </div>
                 {saveError && <p className="text-sm text-red-400">{saveError}</p>}
                 <button type="submit" className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6 py-3 rounded-xl transition text-sm">
-                  Commit Parameters Change
+                  Save Booking Fee
                 </button>
               </form>
             )}

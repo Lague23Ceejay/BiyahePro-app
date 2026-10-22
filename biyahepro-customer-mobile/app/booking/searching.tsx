@@ -14,7 +14,8 @@ const LIVE_STATUSES = ['accepted', 'en_route', 'arrived', 'in_progress'];
 export default function SearchingForDriverScreen() {
   const { session } = useAuth();
   const { tripId } = useLocalSearchParams<{ tripId?: string }>();
-  const { status: pushedStatus, connectionState, driverLocation } = useTripUpdates(tripId, session?.accessToken, 'requested');
+  const { status: pushedStatus, connectionState, driverLocation, fareAmount: liveFareAmount, spScStatus: liveSpScStatus } =
+    useTripUpdates(tripId, session?.accessToken, 'requested');
   // Full trip snapshot: gives us the pickup/drop-off coordinates for the map,
   // the driver's name/plate, and doubles as the one-time status catch-up.
   const [trip, setTrip] = useState<Trip | null>(null);
@@ -121,6 +122,24 @@ export default function SearchingForDriverScreen() {
         </View>
       </View>
 
+      {trip && (
+        <View style={styles.fareCard}>
+          <View style={styles.fareRow}>
+            <Text style={styles.fareLabel}>Current fare</Text>
+            <Text style={styles.fareAmount}>₱{Number(liveFareAmount ?? trip.fareAmount).toFixed(2)}</Text>
+          </View>
+          {(liveSpScStatus ?? trip.spScStatus) === 'pending' && (
+            <Text style={styles.fareHint}>Regular fare applies until your driver verifies your SP/SC ID.</Text>
+          )}
+          {(liveSpScStatus ?? trip.spScStatus) === 'verified' && (
+            <Text style={styles.fareHint}>SP/SC ID verified — 20% discount applied to the base fare.</Text>
+          )}
+          {(liveSpScStatus ?? trip.spScStatus) === 'rejected' && (
+            <Text style={styles.fareHint}>SP/SC ID was not verified — regular fare applies.</Text>
+          )}
+        </View>
+      )}
+
       <View style={styles.actions}>
         <Pressable style={styles.secondaryButton} onPress={() => router.replace('/(tabs)/bookings')}><Text style={styles.secondaryText}>View my bookings</Text></Pressable>
         <Pressable style={styles.cancelButton} onPress={cancelBooking} disabled={cancelling}><Text style={styles.cancelText}>{cancelling ? 'Cancelling...' : 'Cancel booking'}</Text></Pressable>
@@ -143,6 +162,11 @@ const styles = StyleSheet.create({
   statusText: { flex: 1 },
   statusTitle: { color: colors.brandDark, fontWeight: '900', fontSize: 11, letterSpacing: 1 },
   statusCopy: { color: colors.muted, marginTop: 4, lineHeight: 18 },
+  fareCard: { width: '100%', marginTop: 14, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 14 },
+  fareRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  fareLabel: { color: colors.muted, fontSize: 13, fontWeight: '700' },
+  fareAmount: { color: colors.text, fontSize: 18, fontWeight: '900' },
+  fareHint: { color: colors.muted, fontSize: 12, lineHeight: 17, marginTop: 7 },
   actions: { width: '100%', marginTop: 22, gap: 10 },
   secondaryButton: { backgroundColor: colors.brand, borderRadius: 14, paddingVertical: 14, alignItems: 'center' },
   secondaryText: { color: '#fff', fontWeight: '900' },

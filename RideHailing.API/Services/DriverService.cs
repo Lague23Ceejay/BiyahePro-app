@@ -17,6 +17,7 @@ public interface IDriverService
     Task<bool>                       SuspendAsync(Guid driverId, Guid adminId);
     Task<bool>                       ReinstateAsync(Guid driverId, Guid adminId);
     Task<PagedResult<Driver>>        GetAllAsync(string? status, int page, int pageSize);
+    Task<List<DriverLocationMonitoringResponse>> GetLocationMonitoringAsync();
     Task<List<NearbyDriverResponse>> GetNearbyAsync(double lat, double lng);
     Task<DriverStrike?>              IssueStrikeAsync(Guid driverId, Guid adminId, string reason);
     Task<List<DriverStrike>>         GetStrikesAsync(Guid driverId);
@@ -122,6 +123,9 @@ public class DriverService(
     // ── Queries ───────────────────────────────────────────────
     public async Task<PagedResult<Driver>> GetAllAsync(string? status, int page, int pageSize)
         => await driverRepo.GetAllAsync(status, page, pageSize);
+
+    public async Task<List<DriverLocationMonitoringResponse>> GetLocationMonitoringAsync()
+        => await driverRepo.GetLocationMonitoringAsync();
 
     public async Task<List<NearbyDriverResponse>> GetNearbyAsync(double lat, double lng)
     {

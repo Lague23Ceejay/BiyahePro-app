@@ -21,6 +21,11 @@ export type FareEstimateRequest = {
   pickupLongitude: number;
   dropoffLatitude: number;
   dropoffLongitude: number;
+  pickupZoneId?: string;
+  pickupPlaceId?: string;
+  dropoffZoneId?: string;
+  dropoffPlaceId?: string;
+  spScRequested?: boolean;
 };
 
 export type FareEstimate = {
@@ -28,6 +33,9 @@ export type FareEstimate = {
   estimatedDistanceFare: number;
   bookingFee: number;
   estimatedTotal: number;
+  discountedBaseFare: number | null;
+  discountedTotal: number | null;
+  spScRequested: boolean;
   surgeMultiplier: number;
   estimatedDistanceKm: number;
   estimatedMinutes: number;
@@ -39,6 +47,11 @@ export type BookTripRequest = FareEstimateRequest & {
   paymentMethod: 'cash' | 'gcash' | 'card';
   scheduledFor?: string | null;
   vehicleType: 'motorcycle' | 'motorcab';
+  pickupZoneId?: string;
+  pickupPlaceId?: string;
+  dropoffZoneId?: string;
+  dropoffPlaceId?: string;
+  spScRequested?: boolean;
 };
 
 export type Trip = {
@@ -53,6 +66,10 @@ export type Trip = {
   dropoffLatitude?: number;
   dropoffLongitude?: number;
   fareAmount: number;
+  regularBaseFare?: number;
+  baseFare?: number;
+  bookingFee?: number;
+  spScStatus?: 'not_requested' | 'pending' | 'verified' | 'rejected';
   paymentMethod: string;
   vehicleType: 'motorcycle' | 'motorcab';
   scheduledFor?: string | null;
