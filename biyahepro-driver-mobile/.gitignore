@@ -23,3 +23,4 @@ yarn-error.log*
 
 # Expo generates this file for local tooling
 expo-env.d.ts
+assets/app-icon.png

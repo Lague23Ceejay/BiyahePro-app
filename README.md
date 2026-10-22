@@ -87,7 +87,8 @@ BiyahePro - new/                                    ← Root Workspace Directory
 │   ├── 08_seed_admin.sql                          ← Admin account creation
 │   ├── 10_add_booking_fee.sql                     ← Booking fee column addition
 │   ├── 15_official_zone_fares.sql                 ← Official fares & SP/SC verification fields
-│   └── 16_driver_location_monitoring.sql          ← Freshness timestamp for admin fleet map
+│   ├── 16_driver_location_monitoring.sql          ← Freshness timestamp for admin fleet map
+│   └── 17_app_icon.sql                           ← Database-backed mobile launcher icon
 │
 └── RideHailing.API/                               ← Phase 2: ASP.NET Core Web API
     ├── Program.cs                                 ← Application entry & DI container
@@ -187,9 +188,18 @@ Then open:
 
 The API waits for the database health check before starting. The database initialization scripts in `ridehailing-db/` run automatically only when PostgreSQL initializes a new data directory. The scripts are mounted at `/docker-entrypoint-initdb.d` inside the database container and are executed in filename order.
 
-Official zone fares and driver-verified SP/SC discounts require `ridehailing-db/15_official_zone_fares.sql`. The admin Driver Location Map requires `ridehailing-db/16_driver_location_monitoring.sql`. On an existing database, apply both migrations manually; Docker does not rerun initialization scripts for an existing data directory. In Fare Pricing Management, the ordinance fare schedule and 20% SP/SC discount are fixed; admins can change the booking fee.
+Official zone fares and driver-verified SP/SC discounts require `ridehailing-db/15_official_zone_fares.sql`. The admin Driver Location Map requires `ridehailing-db/16_driver_location_monitoring.sql`. The admin Mobile App Icon section requires `ridehailing-db/17_app_icon.sql`. On an existing database, apply the relevant migrations manually; Docker does not rerun initialization scripts for an existing data directory. In Fare Pricing Management, the ordinance fare schedule and 20% SP/SC discount are fixed; admins can change the booking fee.
 
 The admin Driver Location Map refreshes current and last-known driver coordinates every 10 seconds. Driver coordinates are reported while the driver app is in the foreground and location permission is enabled, including when no ride is active. It displays the latest point only; it does not save or replay historical movement routes. Drivers are notified in the app that operations can see their live location while they use the app.
+
+The admin Mobile App Icon section accepts a square PNG (512–2048 pixels, maximum 2 MB) and stores it in PostgreSQL. EAS preview and production builds fetch the uploaded icon before building both customer and driver apps. A native launcher icon cannot be changed on already-installed apps; after changing it, build and distribute updated apps:
+
+```powershell
+cd biyahepro-customer-mobile
+eas build --platform android --profile preview
+cd ..\biyahepro-driver-mobile
+eas build --platform android --profile preview
+```
 
 ### How source code and data are mounted
 

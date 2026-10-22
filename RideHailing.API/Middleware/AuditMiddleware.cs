@@ -17,9 +17,9 @@ public class AuditMiddleware(RequestDelegate next, IConfiguration config)
     private static readonly HashSet<string> AuditedMethods =
         ["POST", "PUT", "PATCH", "DELETE"];
 
-    // Skip noisy non-admin routes (auth, public, SignalR)
+    // Skip noisy routes and binary icon uploads, which are audited in the branding repository.
     private static readonly string[] SkippedPrefixes =
-        ["/api/auth", "/api/settings/public", "/hubs"];
+        ["/api/auth", "/api/settings/public", "/api/branding/app-icon", "/hubs"];
 
     public async Task InvokeAsync(HttpContext context)
     {

@@ -1,3 +1,9 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const appIcon = fs.existsSync(path.join(__dirname, 'assets', 'app-icon.png'))
+  ? './assets/app-icon.png'
+  : undefined;
+
 module.exports = {
   expo: {
     name: 'BiyahePro Customer',
@@ -8,6 +14,7 @@ module.exports = {
     scheme: 'biyahepro',
     userInterfaceStyle: 'automatic',
     newArchEnabled: true,
+    ...(appIcon ? { icon: appIcon } : {}),
     
     updates: {
       url: 'https://u.expo.dev/6c3be8ab-0d3d-4f09-9f8c-f8aeccbd099f',
@@ -28,6 +35,7 @@ module.exports = {
       package: 'com.biyahepro.customer',
       adaptiveIcon: {
         backgroundColor: '#F4F7F5',
+        ...(appIcon ? { foregroundImage: appIcon } : {}),
       },
       edgeToEdgeEnabled: true,
       config: {

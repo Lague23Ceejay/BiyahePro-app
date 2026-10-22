@@ -53,10 +53,12 @@ export function clearSession() {
 export async function apiFetch(path, options = {}) {
   if (!API_BASE) throw new Error('VITE_API_URL is not configured for this deployment.');
   const tokens = getStoredTokens();
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const headers = {
-    'Content-Type': 'application/json',
     ...(options.headers || {}),
   };
+  if (!isFormData) headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+  else delete headers['Content-Type'];
   if (tokens?.accessToken) {
     headers.Authorization = `Bearer ${tokens.accessToken}`;
   }

@@ -96,6 +96,7 @@ builder.Services.AddScoped<IUserRepository,     UserRepository>();
 builder.Services.AddScoped<IDriverRepository,   DriverRepository>();
 builder.Services.AddScoped<ITripRepository,     TripRepository>();
 builder.Services.AddScoped<ISettingsRepository, SettingsRepository>();
+builder.Services.AddScoped<IBrandingRepository, BrandingRepository>();
 
 // ── Services ──────────────────────────────────────────────────
 builder.Services.AddScoped<IAuthService,    AuthService>();
