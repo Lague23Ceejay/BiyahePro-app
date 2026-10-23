@@ -39,6 +39,7 @@ export type FareEstimate = {
   surgeMultiplier: number;
   estimatedDistanceKm: number;
   estimatedMinutes: number;
+  fareBasis: string;
 };
 
 export type BookTripRequest = FareEstimateRequest & {

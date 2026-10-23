@@ -85,10 +85,6 @@ export default function NewBookingScreen() {
 
   const activePoint = target === 'pickup' ? pickup : dropoff;
   const hasAddresses = Boolean(pickup.address.trim() && dropoff.address.trim());
-  const hasOfficialRoute = Boolean(
-    pickup.fareZoneId && pickup.farePlaceId && dropoff.fareZoneId && dropoff.farePlaceId,
-  );
-
   useEffect(() => {
     loadCurrentLocation();
     let mounted = true;
@@ -274,10 +270,6 @@ export default function NewBookingScreen() {
     setError('');
     if (!hasAddresses) {
       setError('Please provide both pickup and destination addresses.');
-      return;
-    }
-    if (!hasOfficialRoute) {
-      setError('Choose pickup and destination from the official fare-zone list. Unlisted routes cannot be booked at an official fare.');
       return;
     }
     const requestId = ++estimateRequestId.current;
@@ -534,6 +526,7 @@ export default function NewBookingScreen() {
             <View style={styles.priceRow}><Text style={styles.muted}>Distance</Text><Text style={styles.value}>{estimate.estimatedDistanceKm.toFixed(1)} km</Text></View>
             <View style={styles.priceRow}><Text style={styles.muted}>Estimated time</Text><Text style={styles.value}>{estimate.estimatedMinutes} min</Text></View>
             <View style={styles.priceRow}><Text style={styles.muted}>Regular base fare</Text><Text style={styles.value}>₱{Number(estimate.baseFare).toFixed(2)}</Text></View>
+            <Text style={styles.fareBasis}>Fare guide: nearest official destination — {estimate.fareBasis}</Text>
             {spScRequested && estimate.discountedBaseFare != null && (
               <View style={styles.priceRow}><Text style={styles.muted}>SP/SC base fare if verified</Text><Text style={styles.value}>₱{Number(estimate.discountedBaseFare).toFixed(2)}</Text></View>
             )}
@@ -620,6 +613,7 @@ const styles = StyleSheet.create({
   paymentBadge: { fontSize: 10, fontWeight: '900', color: colors.brandDark, backgroundColor: colors.brandSoft, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10 },
   priceRow: { flexDirection: 'row', justifyContent: 'space-between' },
   muted: { color: colors.muted },
+  fareBasis: { color: colors.muted, fontSize: 12, marginTop: -5 },
   value: { color: colors.text, fontWeight: '700' },
   total: { borderTopWidth: 1, borderColor: colors.border, paddingTop: 12, marginTop: 4 },
   totalLabel: { fontSize: 18, fontWeight: '900', color: colors.text },

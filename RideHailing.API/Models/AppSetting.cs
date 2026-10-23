@@ -54,6 +54,9 @@ public static class SettingKeys
 
     // Operations
     public const string OpsDriverRadius      = "ops.driver_search_radius_km";
+    public const string ServiceAreaLatitude  = "service_area.latitude";
+    public const string ServiceAreaLongitude = "service_area.longitude";
+    public const string ServiceAreaRadiusKm  = "service_area.radius_km";
     public const string OpsCancelWindow      = "ops.cancel_window_minutes";
     public const string OpsDriverTimeout     = "ops.driver_arrival_timeout";
     public const string OpsPingInterval      = "ops.location_ping_seconds";

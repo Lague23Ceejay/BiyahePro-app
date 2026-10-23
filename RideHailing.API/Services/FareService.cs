@@ -17,9 +17,20 @@ public class FareService(ISettingsService settings) : IFareService
             !double.IsFinite(req.DropoffLongitude) || req.DropoffLongitude is < -180 or > 180)
             throw new InvalidOperationException("Choose valid pickup and destination coordinates.");
 
-        var regularBaseFare = OfficialFareSchedule.GetRegularFare(
-            req.PickupZoneId, req.PickupPlaceId, req.DropoffZoneId, req.DropoffPlaceId,
-            req.PickupLatitude, req.PickupLongitude, req.DropoffLatitude, req.DropoffLongitude);
+        var serviceLatitude = (double)await settings.GetDecimalAsync(SettingKeys.ServiceAreaLatitude, 8.6549m);
+        var serviceLongitude = (double)await settings.GetDecimalAsync(SettingKeys.ServiceAreaLongitude, 123.4243m);
+        var serviceRadiusKm = (double)await settings.GetDecimalAsync(SettingKeys.ServiceAreaRadiusKm, 20m);
+        if (!double.IsFinite(serviceLatitude) || serviceLatitude is < -90 or > 90 ||
+            !double.IsFinite(serviceLongitude) || serviceLongitude is < -180 or > 180 ||
+            !double.IsFinite(serviceRadiusKm) || serviceRadiusKm <= 0 || serviceRadiusKm > 1000)
+            throw new InvalidOperationException("The booking service area is not configured correctly. Please contact support.");
+
+        EnsureWithinServiceArea(req.PickupLatitude, req.PickupLongitude, serviceLatitude, serviceLongitude, serviceRadiusKm, "Pickup");
+        EnsureWithinServiceArea(req.DropoffLatitude, req.DropoffLongitude, serviceLatitude, serviceLongitude, serviceRadiusKm, "Destination");
+
+        var destinationFare = OfficialFareSchedule.GetNearestDestinationFare(
+            req.DropoffZoneId, req.DropoffPlaceId, req.DropoffLatitude, req.DropoffLongitude);
+        var regularBaseFare = destinationFare.RegularFare;
         var discountedBaseFare = Math.Round(
             regularBaseFare * (1m - OfficialFareSchedule.SpScDiscount), 2, MidpointRounding.AwayFromZero);
         var bookingFee = await settings.GetDecimalAsync(SettingKeys.FareBookingFee, 5m);
@@ -36,8 +47,21 @@ public class FareService(ISettingsService settings) : IFareService
             SpScRequested: req.SpScRequested,
             SurgeMultiplier: 1.0m,
             EstimatedDistanceKm: Math.Round(distKm, 2),
-            EstimatedMinutes: estimatedMinutes
+            EstimatedMinutes: estimatedMinutes,
+            FareBasis: destinationFare.Name
         );
+    }
+
+    private static void EnsureWithinServiceArea(
+        double latitude,
+        double longitude,
+        double centerLatitude,
+        double centerLongitude,
+        double radiusKm,
+        string pointName)
+    {
+        if (HaversineKm(latitude, longitude, centerLatitude, centerLongitude) > radiusKm)
+            throw new InvalidOperationException($"{pointName} is outside the service area. Move the pin inside the orange circle on the map.");
     }
 
     private static double HaversineKm(double lat1, double lon1, double lat2, double lon2)

@@ -41,9 +41,9 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
           const data = await response.json();
           const mappedSettings = {};
           data.forEach(item => { mappedSettings[item.key] = item.value; });
-          mappedSettings['service_area.latitude'] ??= '8.152';
-          mappedSettings['service_area.longitude'] ??= '123.258';
-          mappedSettings['service_area.radius_km'] ??= '5';
+          mappedSettings['service_area.latitude'] ??= '8.6549';
+          mappedSettings['service_area.longitude'] ??= '123.4243';
+          mappedSettings['service_area.radius_km'] ??= '20';
           setSettings(mappedSettings);
         }
       } catch (error) {
@@ -98,6 +98,11 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
   };
 
   const handleSaveServiceArea = async () => {
+    const radiusKm = Number(settings['service_area.radius_km']);
+    if (!Number.isFinite(radiusKm) || radiusKm <= 0 || radiusKm > 1000) {
+      setServiceAreaMessage('Enter a service radius greater than 0 and no more than 1000 km.');
+      return;
+    }
     setServiceAreaSaving(true);
     setServiceAreaMessage('');
     try {
@@ -118,8 +123,8 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
   };
 
   const serviceArea = {
-    lat: Number(settings['service_area.latitude'] || 8.152),
-    lng: Number(settings['service_area.longitude'] || 123.258),
+    lat: Number(settings['service_area.latitude'] || 8.6549),
+    lng: Number(settings['service_area.longitude'] || 123.4243),
   };
 
   return (
@@ -238,12 +243,12 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
             <div className="p-4 border-b border-slate-800">
               <h2 className="font-bold">Service Area</h2>
               <p className="text-xs text-slate-400 mt-1">
-                Drag the orange marker or tap the map to choose the service-area center. Save the change to publish the circle to customer and driver maps.
+                Both pickup and destination must be inside this circle to book. Drag the marker or tap the map to choose its center, and set a radius that covers all fare zones.
               </p>
             </div>
             <LeafletMap
               center={serviceArea}
-              radiusKm={Number(settings['service_area.radius_km'] || 5)}
+              radiusKm={Number(settings['service_area.radius_km'] || 20)}
               onMove={(point) => {
                 handleSettingChange('service_area.latitude', point.lat.toFixed(6));
                 handleSettingChange('service_area.longitude', point.lng.toFixed(6));
@@ -251,6 +256,19 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
               }}
             />
             <div className="flex flex-wrap items-center gap-3 p-4">
+              <label className="flex items-center gap-2 text-sm text-slate-300">
+                Service radius
+                <input
+                  type="number"
+                  min="0.1"
+                  max="1000"
+                  step="0.1"
+                  value={settings['service_area.radius_km'] || '20'}
+                  onChange={(e) => handleSettingChange('service_area.radius_km', e.target.value)}
+                  className="w-28 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
+                />
+                km
+              </label>
               <button
                 type="button"
                 onClick={handleSaveServiceArea}
@@ -261,7 +279,7 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
               </button>
               {serviceAreaMessage && <p role="status" className="text-sm text-slate-300">{serviceAreaMessage}</p>}
               <p className="w-full text-xs text-slate-500">
-                Center: {serviceArea.lat.toFixed(6)}, {serviceArea.lng.toFixed(6)} · Radius: {Number(settings['service_area.radius_km'] || 5)} km
+                Center: {serviceArea.lat.toFixed(6)}, {serviceArea.lng.toFixed(6)} · Radius: {Number(settings['service_area.radius_km'] || 20)} km
               </p>
             </div>
           </div>
@@ -311,7 +329,7 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
               <form onSubmit={handleSaveFareSettings} className="max-w-5xl space-y-6">
                 <header className="mb-8">
                   <h1 className="text-2xl font-bold tracking-tight">Official Zone Fare Schedule</h1>
-                  <p className="text-slate-400 text-sm mt-1">Official base fares for listed routes. SP/SC receives 20% off the base fare after the driver verifies a valid ID.</p>
+                  <p className="text-slate-400 text-sm mt-1">Map destinations use the nearest listed official fare as a guide. SP/SC receives 20% off the base fare after the driver verifies a valid ID.</p>
                 </header>
                 <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
                   <div className="max-h-[55vh] overflow-auto rounded-xl border border-slate-800">

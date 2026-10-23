@@ -50,7 +50,7 @@ public class SettingsController(ISettingsRepository settingsRepo, ISettingsServi
             return Unauthorized();
 
         await settingsRepo.UpdateAsync(key, req.Value, adminId);
-        await settingsService.InvalidateCacheAsync();
+        await settingsService.InvalidateCacheAsync(key);
         return NoContent();
     }
 }

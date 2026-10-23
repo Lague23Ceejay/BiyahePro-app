@@ -47,52 +47,21 @@ public static class OfficialFareSchedule
             [("zone-5-6", "daro")] = new("zone-5-6", "daro", "Daro", 60m, 8.6627, 123.4770)
         };
 
-    public static decimal GetRegularFare(
-        string? pickupZoneId,
-        string? pickupPlaceId,
+    public static OfficialFareRoute GetNearestDestinationFare(
         string? dropoffZoneId,
         string? dropoffPlaceId,
-        double pickupLatitude,
-        double pickupLongitude,
         double dropoffLatitude,
         double dropoffLongitude)
     {
-        if (!Routes.TryGetValue((dropoffZoneId ?? "", dropoffPlaceId ?? ""), out var route))
-            throw new InvalidOperationException("Choose a destination listed in the official fare zones.");
+        if (!double.IsFinite(dropoffLatitude) || !double.IsFinite(dropoffLongitude))
+            throw new InvalidOperationException("Choose a valid destination on the map.");
 
-        var isPoblacionOrigin = pickupZoneId == "zone-1" && pickupPlaceId == "within-poblacion";
-        var isPoloOrigin = pickupZoneId == "zone-2" && pickupPlaceId == "polo";
-        var pickupCenter = isPoblacionOrigin
-            ? (Latitude: 8.6549, Longitude: 123.4243)
-            : isPoloOrigin
-                ? (Latitude: 8.6319, Longitude: 123.4104)
-                : (Latitude: double.NaN, Longitude: double.NaN);
-        if (DistanceKm(pickupLatitude, pickupLongitude, pickupCenter.Latitude, pickupCenter.Longitude) > 1.5 ||
-            DistanceKm(dropoffLatitude, dropoffLongitude, route.Latitude, route.Longitude) > 1.5)
-            throw new InvalidOperationException("The selected map pins do not match the selected official fare-zone places.");
+        if (Routes.TryGetValue((dropoffZoneId ?? "", dropoffPlaceId ?? ""), out var selectedRoute) &&
+            DistanceKm(dropoffLatitude, dropoffLongitude, selectedRoute.Latitude, selectedRoute.Longitude) <= 1.5)
+            return selectedRoute;
 
-        var originMatches = route.ZoneId switch
-        {
-            "zone-1" => isPoblacionOrigin,
-            "zone-2" => isPoblacionOrigin || (isPoloOrigin && route.PlaceId != "polo"),
-            "zone-3" => isPoloOrigin,
-            "zone-4" or "zone-5-6" => isPoblacionOrigin,
-            _ => false
-        };
-
-        if (!originMatches)
-        {
-            var expectedOrigin = route.ZoneId switch
-            {
-                "zone-2" => "Poblacion or Polo",
-                "zone-3" => "Polo",
-                "zone-4" or "zone-5-6" => "Poblacion",
-                _ => "Poblacion"
-            };
-            throw new InvalidOperationException($"{route.Name} has an official fare only from {expectedOrigin}.");
-        }
-
-        return route.RegularFare;
+        return Routes.Values
+            .MinBy(route => DistanceKm(dropoffLatitude, dropoffLongitude, route.Latitude, route.Longitude))!;
     }
 
     private static double DistanceKm(double lat1, double lon1, double lat2, double lon2)

@@ -131,7 +131,8 @@ public record FareEstimateResponse(
     bool SpScRequested,
     decimal SurgeMultiplier,
     double  EstimatedDistanceKm,
-    int     EstimatedMinutes
+    int     EstimatedMinutes,
+    string  FareBasis
 );
 
 public record TripSummaryResponse(

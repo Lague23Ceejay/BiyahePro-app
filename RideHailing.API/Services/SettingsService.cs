@@ -9,7 +9,7 @@ public interface ISettingsService
     Task<decimal> GetDecimalAsync(string key, decimal defaultValue = 0);
     Task<int> GetIntAsync(string key, int defaultValue = 0);
     Task<bool> GetBoolAsync(string key, bool defaultValue = false);
-    Task InvalidateCacheAsync();
+    Task InvalidateCacheAsync(string key);
 }
 
 public class SettingsService(ISettingsRepository repo, IMemoryCache cache) : ISettingsService
@@ -47,9 +47,9 @@ public class SettingsService(ISettingsRepository repo, IMemoryCache cache) : ISe
         return bool.TryParse(val, out var result) ? result : defaultValue;
     }
 
-    public Task InvalidateCacheAsync()
+    public Task InvalidateCacheAsync(string key)
     {
-        // Entries expire automatically based on CacheTtl
+        cache.Remove(CachePrefix + key);
         return Task.CompletedTask;
     }
 }
