@@ -17,19 +17,45 @@ public class BrandingController(IBrandingRepository brandingRepository) : Contro
     [HttpGet("app-icon")]
     [AllowAnonymous]
     public async Task<IActionResult> GetAppIcon()
-    {
-        var asset = await brandingRepository.GetAppIconAsync();
-        if (asset == null) return NotFound(new { message = "No custom app icon has been uploaded." });
+        => await ReadAppIconAsync("app_icon");
 
-        Response.Headers.CacheControl = "no-cache";
-        return File(asset.Content, asset.ContentType);
+    [HttpGet("app-icon/{appType}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetAppIcon(string appType)
+    {
+        var assetKey = GetAssetKey(appType);
+        if (assetKey == null) return BadRequest(new { message = "App type must be customer or driver." });
+        return await ReadAppIconAsync(assetKey);
     }
 
     [HttpPut("app-icon")]
     [Authorize(Roles = "admin")]
     [RequestSizeLimit(MaxRequestSizeBytes)]
     [RequestFormLimits(MultipartBodyLengthLimit = MaxRequestSizeBytes)]
-    public async Task<IActionResult> UploadAppIcon([FromForm] IFormFile? file)
+    public async Task<IActionResult> UploadLegacyAppIcon([FromForm] IFormFile? file)
+        => await UploadIconAsync("app_icon", file);
+
+    [HttpPut("app-icon/{appType}")]
+    [Authorize(Roles = "admin")]
+    [RequestSizeLimit(MaxRequestSizeBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MaxRequestSizeBytes)]
+    public async Task<IActionResult> UploadAppIcon(string appType, [FromForm] IFormFile? file)
+    {
+        var assetKey = GetAssetKey(appType);
+        if (assetKey == null) return BadRequest(new { message = "App type must be customer or driver." });
+        return await UploadIconAsync(assetKey, file);
+    }
+
+    private async Task<IActionResult> ReadAppIconAsync(string assetKey)
+    {
+        var asset = await brandingRepository.GetAppIconAsync(assetKey);
+        if (asset == null) return NotFound(new { message = "No custom app icon has been uploaded." });
+
+        Response.Headers.CacheControl = "no-cache";
+        return File(asset.Content, asset.ContentType);
+    }
+
+    private async Task<IActionResult> UploadIconAsync(string assetKey, IFormFile? file)
     {
         if (file == null || file.Length == 0)
             return BadRequest(new { message = "Choose a PNG image to upload." });
@@ -51,7 +77,14 @@ public class BrandingController(IBrandingRepository brandingRepository) : Contro
         var claimId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!Guid.TryParse(claimId, out var adminId)) return Unauthorized();
 
-        await brandingRepository.SaveAppIconAsync(content, "image/png", adminId);
+        await brandingRepository.SaveAppIconAsync(assetKey, content, "image/png", adminId);
         return NoContent();
     }
+
+    private static string? GetAssetKey(string appType) => appType.ToLowerInvariant() switch
+    {
+        "customer" => "customer_app_icon",
+        "driver" => "driver_app_icon",
+        _ => null
+    };
 }

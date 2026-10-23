@@ -7,11 +7,11 @@ if (!apiBase) throw new Error('EXPO_PUBLIC_API_URL is required to fetch the curr
 
 const directory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'assets');
 const iconPath = path.join(directory, 'app-icon.png');
-const response = await fetch(`${apiBase}/api/branding/app-icon`);
+const response = await fetch(`${apiBase}/api/branding/app-icon/customer`);
 
 if (response.status === 404) {
   await rm(iconPath, { force: true });
-  console.log('No custom app icon is configured; using Expo defaults.');
+  console.log('No custom customer app icon is configured; using Expo defaults.');
 } else if (!response.ok) {
   throw new Error(`Unable to download the current app icon (HTTP ${response.status}).`);
 } else {
@@ -27,5 +27,5 @@ if (response.status === 404) {
   }
   await mkdir(directory, { recursive: true });
   await writeFile(iconPath, image);
-  console.log(`Downloaded the current app icon (${width}x${height}).`);
+  console.log(`Downloaded the customer app icon (${width}x${height}).`);
 }

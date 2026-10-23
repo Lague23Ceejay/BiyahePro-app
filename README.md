@@ -88,7 +88,8 @@ BiyahePro - new/                                    ← Root Workspace Directory
 │   ├── 10_add_booking_fee.sql                     ← Booking fee column addition
 │   ├── 15_official_zone_fares.sql                 ← Official fares & SP/SC verification fields
 │   ├── 16_driver_location_monitoring.sql          ← Freshness timestamp for admin fleet map
-│   └── 17_app_icon.sql                           ← Database-backed mobile launcher icon
+│   ├── 17_app_icon.sql                           ← Database-backed mobile launcher icons
+│   └── 18_separate_app_icons.sql                  ← Independent customer and driver icons
 │
 └── RideHailing.API/                               ← Phase 2: ASP.NET Core Web API
     ├── Program.cs                                 ← Application entry & DI container
@@ -127,6 +128,33 @@ BiyahePro - new/                                    ← Root Workspace Directory
         ├── OfficialFareSchedule.cs                ← Ordinance destination fares and origins
         └── SettingsService.cs                     ← Configuration management
 ```
+
+---
+
+## Recent Feature Additions
+
+### Zone-based booking and official fares
+
+- Customers can choose pickup and destination from a zone/place picker or continue using map pins. Zone search is case- and accent-insensitive and accepts common ordinance spelling variants.
+- The API is the source of truth for the official destination fare schedule and validates the selected destination, origin rules, and that map coordinates correspond to the selected places. Unlisted or mismatched routes are rejected.
+- Eligible senior-citizen/person-with-disability (SP/SC) bookings receive a 20% discount on the regular fare. The booking fee is separate from the fare and remains configurable in the admin fare settings.
+- SP/SC bookings require driver verification before the trip can start; pending or rejected verification blocks trip start.
+
+### Live trip tracking and driver monitoring
+
+- During an active trip, driver GPS updates are sent through SignalR so the customer and driver maps can show the driver's changing position. This is live position tracking, not turn-by-turn navigation.
+- The admin Driver Location Map shows current and last-known driver positions, including drivers without an active passenger. The driver app reports location while in the foreground with location permission enabled; the map refreshes every 10 seconds and distinguishes fresh from stale reports.
+- The monitoring feature shows the latest location only. It does not store or replay historical driver routes.
+
+### Admin-managed customer and driver app icons
+
+- The existing Mobile App Icon admin tab contains separate Customer App and Driver App upload cards; no additional admin tab is added. Each accepts a square PNG (512–2048 pixels, up to 2 MB), and the API stores them independently in PostgreSQL.
+- Each mobile project's EAS pre-install hook fetches only that app's icon. Changing an icon affects future builds, not an app already installed, so rebuild and redistribute only the app whose icon changed.
+
+### Database and deployment notes
+
+- New installations apply the SQL files in `ridehailing-db/` during database initialization. Existing databases must be upgraded manually with `15_official_zone_fares.sql`, `16_driver_location_monitoring.sql`, `17_app_icon.sql`, and `18_separate_app_icons.sql` before using the corresponding features. The last migration copies any existing shared icon into both app-specific records; admins can then replace either one independently.
+- Development verification covered the API build, admin build, and customer/driver TypeScript checks. Live database-backed booking and successful remote EAS builds still need to be verified in the target environment.
 
 ---
 
@@ -188,17 +216,17 @@ Then open:
 
 The API waits for the database health check before starting. The database initialization scripts in `ridehailing-db/` run automatically only when PostgreSQL initializes a new data directory. The scripts are mounted at `/docker-entrypoint-initdb.d` inside the database container and are executed in filename order.
 
-Official zone fares and driver-verified SP/SC discounts require `ridehailing-db/15_official_zone_fares.sql`. The admin Driver Location Map requires `ridehailing-db/16_driver_location_monitoring.sql`. The admin Mobile App Icon section requires `ridehailing-db/17_app_icon.sql`. On an existing database, apply the relevant migrations manually; Docker does not rerun initialization scripts for an existing data directory. In Fare Pricing Management, the ordinance fare schedule and 20% SP/SC discount are fixed; admins can change the booking fee.
+Official zone fares and driver-verified SP/SC discounts require `ridehailing-db/15_official_zone_fares.sql`. The admin Driver Location Map requires `ridehailing-db/16_driver_location_monitoring.sql`. The admin Mobile App Icon section requires `ridehailing-db/17_app_icon.sql` and `ridehailing-db/18_separate_app_icons.sql`. On an existing database, apply the relevant migrations manually; Docker does not rerun initialization scripts for an existing data directory. In Fare Pricing Management, the ordinance fare schedule and 20% SP/SC discount are fixed; admins can change the booking fee.
 
 The admin Driver Location Map refreshes current and last-known driver coordinates every 10 seconds. Driver coordinates are reported while the driver app is in the foreground and location permission is enabled, including when no ride is active. It displays the latest point only; it does not save or replay historical movement routes. Drivers are notified in the app that operations can see their live location while they use the app.
 
-The admin Mobile App Icon section accepts a square PNG (512–2048 pixels, maximum 2 MB) and stores it in PostgreSQL. EAS preview and production builds fetch the uploaded icon before building both customer and driver apps. A native launcher icon cannot be changed on already-installed apps; after changing it, build and distribute updated apps:
+The existing admin Mobile App Icon section has separate customer and driver uploads (square PNG, 512–2048 pixels, maximum 2 MB), stored independently in PostgreSQL. Each EAS preview or production build fetches its own app's icon. A native launcher icon cannot be changed on an already-installed app; after changing one, build and distribute that app:
 
 ```powershell
 cd biyahepro-customer-mobile
-eas build --platform android --profile preview
+npx eas-cli@latest build --platform android --profile preview
 cd ..\biyahepro-driver-mobile
-eas build --platform android --profile preview
+npx eas-cli@latest build --platform android --profile preview
 ```
 
 ### How source code and data are mounted
@@ -293,6 +321,19 @@ Run the mobile TypeScript check with:
 ```powershell
 npm run typecheck
 ```
+
+### Create Android preview builds with EAS
+
+Run the build from each app's folder:
+
+```powershell
+cd "C:\Users\lague\Desktop\BiyahePro - new\biyahepro-customer-mobile"
+npx eas-cli@latest build --platform android --profile preview
+cd ..\biyahepro-driver-mobile
+npx eas-cli@latest build --platform android --profile preview
+```
+
+An `ECONNRESET` while requesting `https://api.expo.dev/graphql` means the CLI lost its connection to Expo before the build was submitted; it does not by itself indicate a project compilation error. Retry after checking network access, VPN/proxy/firewall settings, and Expo service status. Updating the CLI can address an outdated-client warning, but does not fix a network connection reset.
 
 ---
 
