@@ -19,8 +19,10 @@ function buildMapSource(center, radiusKm) {
       if(recenter)map.setView(point,map.getZoom());
     }
     function move(point){
-      updateArea(point,area.getRadius()/1000,false);
-      window.parent.postMessage({type:'service-area-move',latitude:point.lat,longitude:point.lng},'*');
+      const longitude=((point.lng+180)%360+360)%360-180;
+      const normalizedPoint=L.latLng(point.lat,longitude);
+      updateArea(normalizedPoint,area.getRadius()/1000,false);
+      window.parent.postMessage({type:'service-area-move',latitude:normalizedPoint.lat,longitude:normalizedPoint.lng},'*');
     }
     marker.on('dragend',function(){move(marker.getLatLng());marker.openPopup()});
     map.on('click',function(event){move(event.latlng)});

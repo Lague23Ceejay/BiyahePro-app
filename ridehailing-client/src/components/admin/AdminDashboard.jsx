@@ -98,7 +98,17 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
   };
 
   const handleSaveServiceArea = async () => {
+    const latitude = Number(settings['service_area.latitude']);
+    const longitude = Number(settings['service_area.longitude']);
     const radiusKm = Number(settings['service_area.radius_km']);
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+      setServiceAreaMessage('Enter a valid service-area latitude between -90 and 90 degrees.');
+      return;
+    }
+    if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      setServiceAreaMessage('Enter a valid service-area longitude between -180 and 180 degrees. Click the map to select a valid center.');
+      return;
+    }
     if (!Number.isFinite(radiusKm) || radiusKm <= 0 || radiusKm > 1000) {
       setServiceAreaMessage('Enter a service radius greater than 0 and no more than 1000 km.');
       return;
