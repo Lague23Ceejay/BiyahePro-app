@@ -150,12 +150,12 @@ export default function AppIconSettings({ onAuthError }) {
       <header className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Mobile App Icons</h1>
         <p className="text-slate-400 text-sm mt-1">
-          Set independent launcher icons for the customer and driver apps in this section.
+          Set independent launcher icons for the passenger and driver apps in this section.
         </p>
       </header>
 
       <div className="space-y-5">
-        <AppIconCard appType="customer" appName="Customer" onAuthError={onAuthError} />
+        <AppIconCard appType="customer" appName="Passenger" onAuthError={onAuthError} />
         <AppIconCard appType="driver" appName="Driver" onAuthError={onAuthError} />
       </div>
 

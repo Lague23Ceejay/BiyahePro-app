@@ -123,7 +123,7 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
         });
         if (!response.ok) throw new Error(`Unable to save ${key}.`);
       }
-      setServiceAreaMessage('Service area saved and published to customer and driver maps.');
+      setServiceAreaMessage('Service area saved and published to passenger and driver maps.');
     } catch (error) {
       if (error.isAuthError) { onAuthError(); return; }
       setServiceAreaMessage(error instanceof Error ? error.message : 'Unable to save the service area.');

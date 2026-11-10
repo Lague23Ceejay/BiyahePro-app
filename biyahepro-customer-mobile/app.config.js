@@ -6,7 +6,7 @@ const appIcon = fs.existsSync(path.join(__dirname, 'assets', 'app-icon.png'))
 
 module.exports = {
   expo: {
-    name: 'BiyahePro Customer',
+    name: 'BiyahePro Passenger',
     slug: 'biyahepro-customer',
     owner: 'monomy',
     version: '0.1.0',

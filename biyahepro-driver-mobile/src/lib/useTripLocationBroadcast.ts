@@ -1,9 +1,9 @@
 // While a trip is active: watch the phone's GPS, expose the latest position
-// to the UI, and stream it to the customer through the SignalR hub.
+// to the UI, and stream it to the passenger through the SignalR hub.
 //
 // This is separate from useLocationSync (a 15 s REST ping that keeps the
 // driver discoverable for new requests). That ping updates the database only —
-// it never reaches the customer — so live tracking needs this hook.
+// it never reaches the passenger — so live tracking needs this hook.
 import { useEffect, useState } from 'react';
 import * as Location from 'expo-location';
 import { sendTripLocation } from '@/src/lib/rideHub';
@@ -28,7 +28,7 @@ export function useTripLocationBroadcast(token: string | undefined, tripId: stri
     (async () => {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== 'granted') {
-        if (!cancelled) setError('Location permission is needed so the customer can see you on the map.');
+        if (!cancelled) setError('Location permission is needed so the passenger can see you on the map.');
         return;
       }
 

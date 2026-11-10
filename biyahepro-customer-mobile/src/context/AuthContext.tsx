@@ -31,7 +31,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     isLoading,
     async signIn(email, password, rememberDevice) {
       const next = await api.login(email.trim(), password);
-      if (next.role !== 'customer') throw new Error('Please use a customer account in this app.');
+      if (next.role !== 'customer') throw new Error('Please use a passenger account in this app.');
       const saved = { ...next, rememberDevice };
       if (rememberDevice) await saveSession(saved); else await clearSession();
       setActiveSession(saved, setSession);
@@ -39,7 +39,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     },
     async register(payload, rememberDevice) {
       const next = await api.register(payload);
-      if (next.role !== 'customer') throw new Error('Customer registration failed.');
+      if (next.role !== 'customer') throw new Error('Passenger registration failed.');
       const saved = { ...next, rememberDevice };
       if (rememberDevice) await saveSession(saved); else await clearSession();
       setActiveSession(saved, setSession);

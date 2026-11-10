@@ -142,7 +142,7 @@ export default function LiveHomeScreen() {
             <View style={styles.empty}>
               <Text style={styles.emptyTitle}>No incoming rides</Text>
               <Text style={styles.muted}>
-                {available ? 'New customer bookings will appear here.' : 'Go online to receive ride requests.'}
+                {available ? 'New passenger bookings will appear here.' : 'Go online to receive ride requests.'}
               </Text>
             </View>
           ) : (
@@ -173,7 +173,7 @@ function Stat({ value, label }: { value: string; label: string }) {
 function RequestCard({ request, onAccept, onDecline }: { request: any; onAccept: () => void; onDecline: () => void }) {
   return (
     <View style={styles.card}>
-      <Text style={styles.name}>{request.customerName || 'Customer'}</Text>
+      <Text style={styles.name}>{request.customerName || 'Passenger'}</Text>
       <Text style={styles.meta}>Requested {new Date(request.requestedAt).toLocaleTimeString()}</Text>
       
       {/* Integrated formatDistance here */}

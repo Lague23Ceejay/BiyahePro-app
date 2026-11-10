@@ -71,7 +71,7 @@ export default function LiveTrips({ onAuthError }) {
           <table className="w-full text-left text-sm border-collapse">
             <thead>
               <tr className="border-b border-slate-800 text-slate-400 font-semibold bg-slate-950/40">
-                <th className="p-4">Customer</th>
+                <th className="p-4">Passenger</th>
                 <th className="p-4">Driver</th>
                 <th className="p-4">Pickup / Dropoff Route</th>
                 <th className="p-4">Fare</th>

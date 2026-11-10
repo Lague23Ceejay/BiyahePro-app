@@ -11,7 +11,7 @@ export default function AccountScreen() {
     <View style={styles.page}>
       <View style={styles.avatar}><Text style={styles.avatarText}>{session?.fullName?.slice(0, 1).toUpperCase()}</Text></View>
       <Text style={styles.name}>{session?.fullName}</Text>
-      <Text style={styles.role}>Customer account</Text>
+      <Text style={styles.role}>Passenger account</Text>
       <View style={styles.card}><Text style={styles.label}>User ID</Text><Text style={styles.value}>{session?.userId}</Text></View>
       <AppButton title="Sign out" onPress={logout} variant="secondary" />
     </View>

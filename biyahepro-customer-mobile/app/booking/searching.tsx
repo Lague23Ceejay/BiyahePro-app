@@ -87,7 +87,7 @@ export default function SearchingForDriverScreen() {
     setCancelling(true);
     setError('');
     try {
-      await api.cancelTrip(tripId, 'Customer cancelled the booking.', session.accessToken);
+      await api.cancelTrip(tripId, 'Passenger cancelled the booking.', session.accessToken);
       router.replace('/(tabs)/bookings');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unable to cancel this booking.');

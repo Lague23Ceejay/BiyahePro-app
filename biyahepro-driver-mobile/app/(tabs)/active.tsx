@@ -99,7 +99,7 @@ export default function ActiveScreen() {
   const step = trip ? STEP[trip.status] : undefined;
 
   // Live tracking: while a trip is active, watch GPS, stream it to the
-  // customer, and use the same position to show distance on this screen.
+  // passenger, and use the same position to show distance on this screen.
   const tripIsActive = !!trip && activeStatuses.has(trip.status);
   const { position, error: gpsError } = useTripLocationBroadcast(session?.accessToken, trip?.id, tripIsActive);
   const pickup = trip && trip.pickupLatitude != null && trip.pickupLongitude != null
@@ -121,12 +121,12 @@ export default function ActiveScreen() {
       ) : !trip ? (
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>No active ride</Text>
-          <Text style={styles.muted}>Accepted customer bookings will appear here.</Text>
+          <Text style={styles.muted}>Accepted passenger bookings will appear here.</Text>
         </View>
       ) : (
         <View style={styles.card}>
           <Text style={styles.step}>{(step?.label || trip.status).toString()}</Text>
-          <Text style={styles.name}>{trip.customerName || 'Customer'}</Text>
+          <Text style={styles.name}>{trip.customerName || 'Passenger'}</Text>
           <View style={styles.route}>
             <Text><Text style={styles.green}>●</Text> {trip.pickupAddress}</Text>
             <Text><Text style={styles.orange}>●</Text> {trip.dropoffAddress}</Text>

@@ -31,7 +31,7 @@ export default function RegisterScreen() {
     <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Create your account</Text>
-        <Text style={styles.subtitle}>Your customer profile will be used for ride bookings.</Text>
+        <Text style={styles.subtitle}>Your profile will be used for ride bookings.</Text>
         <AppInput label="Full name" value={fullName} onChangeText={setFullName} placeholder="Juan Dela Cruz" />
         <AppInput label="Email" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} placeholder="you@example.com" />
         <AppInput label="Phone" keyboardType="phone-pad" value={phone} onChangeText={setPhone} placeholder="09XXXXXXXXX" />
@@ -39,7 +39,7 @@ export default function RegisterScreen() {
         <Text style={styles.hint}>Use at least 8 characters with an uppercase letter, number, and symbol.</Text>
         <Pressable style={styles.remember} onPress={() => setRememberDevice(value => !value)}><Text style={styles.checkbox}>{rememberDevice ? '✓' : ''}</Text><Text style={styles.rememberText}>Remember this device</Text></Pressable>
         {!!error && <Text style={styles.error}>{error}</Text>}
-        <AppButton title="Create customer account" onPress={submit} loading={loading} disabled={!valid} />
+        <AppButton title="Create passenger account" onPress={submit} loading={loading} disabled={!valid} />
         <Text style={styles.footer}>Already registered? <Link href="/(auth)/login" style={styles.link}>Sign in</Link></Text>
       </ScrollView>
     </KeyboardAvoidingView>
