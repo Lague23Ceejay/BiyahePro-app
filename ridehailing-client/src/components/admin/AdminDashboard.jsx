@@ -1,6 +1,6 @@
 // File path in project: ridehailing-client/src/components/admin/AdminDashboard.jsx
 import { useState, useEffect } from 'react';
-import { Shield, Settings, CreditCard, LogOut, Car, Users, UserCog, LayoutDashboard, BarChart3, MapPin, Image } from 'lucide-react';
+import { Shield, Settings, CreditCard, LogOut, Car, Users, UserCog, LayoutDashboard, BarChart3, MapPin, Image, Globe } from 'lucide-react';
 import LiveTrips from './LiveTrips';
 import AuditLogs from './AuditLogs';
 import DriversPanel from './DriversPanel';
@@ -8,6 +8,7 @@ import UsersPanel from './UsersPanel';
 import OverviewPanel from './OverviewPanel';
 import FleetTrackingPanel from './FleetTrackingPanel';
 import AppIconSettings from './AppIconSettings';
+import PassengerWebsiteEditor from './PassengerWebsiteEditor';
 import LeafletMap from './LeafletMap';
 import { apiFetch } from '../../lib/api';
 
@@ -219,6 +220,15 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
             </button>
             <button
               type="button"
+              onClick={() => setActiveTab('passenger-website')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition ${
+                activeTab === 'passenger-website' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/10' : 'text-slate-400 hover:bg-slate-800'
+              }`}
+            >
+              <Globe className="w-4 h-4" /> Passenger Website
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveTab('audit')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition ${
                 activeTab === 'audit' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/10' : 'text-slate-400 hover:bg-slate-800'
@@ -247,6 +257,7 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
         {activeTab === 'drivers' && <DriversPanel onAuthError={onAuthError} />}
         {activeTab === 'fleet-map' && <FleetTrackingPanel onAuthError={onAuthError} />}
         {activeTab === 'app-icon' && <AppIconSettings onAuthError={onAuthError} />}
+        {activeTab === 'passenger-website' && <PassengerWebsiteEditor onAuthError={onAuthError} />}
         {activeTab === 'audit' && <AuditLogs onAuthError={onAuthError} />}
         {(activeTab === 'general' || activeTab === 'fares') && (
           <div className="mb-6 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
@@ -294,8 +305,8 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
             </div>
           </div>
         )}
-        {(activeTab !== 'general' && activeTab !== 'fares' && activeTab !== 'dashboard' && activeTab !== 'users' && activeTab !== 'trips' && activeTab !== 'analytics' && activeTab !== 'drivers' && activeTab !== 'fleet-map' && activeTab !== 'app-icon' && activeTab !== 'audit') && <p className="text-slate-400">Select an admin section.</p>}
-        {activeTab !== 'general' && activeTab !== 'fares' && activeTab !== 'dashboard' && activeTab !== 'users' && activeTab !== 'trips' && activeTab !== 'analytics' && activeTab !== 'drivers' && activeTab !== 'fleet-map' && activeTab !== 'app-icon' && activeTab !== 'audit' ? null : null}
+        {(activeTab !== 'general' && activeTab !== 'fares' && activeTab !== 'dashboard' && activeTab !== 'users' && activeTab !== 'trips' && activeTab !== 'analytics' && activeTab !== 'drivers' && activeTab !== 'fleet-map' && activeTab !== 'app-icon' && activeTab !== 'passenger-website' && activeTab !== 'audit') && <p className="text-slate-400">Select an admin section.</p>}
+        {activeTab !== 'general' && activeTab !== 'fares' && activeTab !== 'dashboard' && activeTab !== 'users' && activeTab !== 'trips' && activeTab !== 'analytics' && activeTab !== 'drivers' && activeTab !== 'fleet-map' && activeTab !== 'app-icon' && activeTab !== 'passenger-website' && activeTab !== 'audit' ? null : null}
         {activeTab !== 'general' && activeTab !== 'fares' ? null : (
         <>
         {(activeTab === 'general' || activeTab === 'fares') && loading ? (

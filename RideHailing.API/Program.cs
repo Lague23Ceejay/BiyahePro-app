@@ -79,14 +79,20 @@ builder.Services.AddSignalR(options =>
 });
 
 // ── CORS ──────────────────────────────────────────────────────
+var allowedOrigins = new[]
+    {
+        "https://biyahe-pro-app.vercel.app",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+    }
+    .Concat(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [])
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
-        policy.WithOrigins(
-                  "https://biyahe-pro-app.vercel.app",
-                  "http://localhost:5173",
-                  "http://127.0.0.1:5173"
-              )
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyMethod()
               .AllowAnyHeader());
 });
