@@ -8,6 +8,9 @@ public interface IBrandingRepository
 {
     Task<AppIconAsset?> GetAppIconAsync(string assetKey);
     Task SaveAppIconAsync(string assetKey, byte[] content, string contentType, Guid adminId);
+    Task<WebsiteImageAsset?> GetWebsiteImageAsync(string assetKey);
+    Task<bool> WebsiteImageExistsAsync(string assetKey);
+    Task SaveWebsiteImageAsync(string assetKey, byte[] content, string contentType, Guid adminId);
 }
 
 public class BrandingRepository(IConfiguration config) : IBrandingRepository
@@ -56,6 +59,60 @@ public class BrandingRepository(IConfiguration config) : IBrandingRepository
             AssetKey = assetKey,
             OldValue = oldSize.HasValue ? $"image/png ({oldSize.Value} bytes)" : "not set",
             NewValue = $"image/png ({content.Length} bytes)",
+        }, transaction);
+
+        await transaction.CommitAsync();
+    }
+
+    public async Task<WebsiteImageAsset?> GetWebsiteImageAsync(string assetKey)
+    {
+        using var db = Connection();
+        return await db.QuerySingleOrDefaultAsync<WebsiteImageAsset>(
+            "SELECT content, content_type AS ContentType, updated_at AS UpdatedAt FROM website_assets WHERE asset_key = @AssetKey",
+            new { AssetKey = assetKey });
+    }
+
+    public async Task<bool> WebsiteImageExistsAsync(string assetKey)
+    {
+        using var db = Connection();
+        return await db.ExecuteScalarAsync<bool>(
+            "SELECT EXISTS (SELECT 1 FROM website_assets WHERE asset_key = @AssetKey)",
+            new { AssetKey = assetKey });
+    }
+
+    public async Task SaveWebsiteImageAsync(string assetKey, byte[] content, string contentType, Guid adminId)
+    {
+        using var db = Connection();
+        await db.OpenAsync();
+        await using var transaction = await db.BeginTransactionAsync();
+
+        var oldSize = await db.QuerySingleOrDefaultAsync<int?>(
+            "SELECT octet_length(content) FROM website_assets WHERE asset_key = @AssetKey FOR UPDATE",
+            new { AssetKey = assetKey },
+            transaction: transaction);
+
+        await db.ExecuteAsync("""
+            INSERT INTO website_assets (asset_key, content, content_type, updated_by, updated_at)
+            VALUES (@AssetKey, @Content, @ContentType, @AdminId, NOW())
+            ON CONFLICT (asset_key) DO UPDATE
+            SET content = EXCLUDED.content,
+                content_type = EXCLUDED.content_type,
+                updated_by = EXCLUDED.updated_by,
+                updated_at = NOW()
+            """, new { AssetKey = assetKey, Content = content, ContentType = contentType, AdminId = adminId }, transaction);
+
+        await db.ExecuteAsync("""
+            INSERT INTO admin_audit_log
+                (admin_id, action, entity_type, entity_id, old_value, new_value)
+            VALUES
+                (@AdminId, 'UPDATE_WEBSITE_IMAGE', 'website_assets', @AssetKey,
+                 to_jsonb(@OldValue::text), to_jsonb(@NewValue::text))
+            """, new
+        {
+            AdminId = adminId,
+            AssetKey = assetKey,
+            OldValue = oldSize.HasValue ? $"{oldSize.Value} bytes" : "not set",
+            NewValue = $"{contentType} ({content.Length} bytes)",
         }, transaction);
 
         await transaction.CommitAsync();

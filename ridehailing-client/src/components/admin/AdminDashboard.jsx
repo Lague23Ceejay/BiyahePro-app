@@ -137,6 +137,7 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
     lat: Number(settings['service_area.latitude'] || 8.6549),
     lng: Number(settings['service_area.longitude'] || 123.4243),
   };
+  const isSettingsTab = ['general', 'fares', 'app-icon', 'passenger-website'].includes(activeTab);
 
   return (
     <div className="fixed inset-0 bg-slate-950 flex text-slate-100 font-sans z-10">
@@ -168,29 +169,51 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
               type="button"
               onClick={() => setActiveTab('general')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition ${
-                activeTab === 'general' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/10' : 'text-slate-400 hover:bg-slate-800'
+                isSettingsTab ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/10' : 'text-slate-400 hover:bg-slate-800'
               }`}
             >
               <Settings className="w-4 h-4" /> Settings
             </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('fares')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition ${
-                activeTab === 'fares' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/10' : 'text-slate-400 hover:bg-slate-800'
-              }`}
-            >
-              <CreditCard className="w-4 h-4" /> Fare Pricing Management
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('trips')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition ${
-                activeTab === 'trips' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/10' : 'text-slate-400 hover:bg-slate-800'
-              }`}
-            >
-              <Car className="w-4 h-4" /> Live System Trips
-            </button>
+            {isSettingsTab && (
+              <div className="ml-3 border-l border-slate-700 pl-2 space-y-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('general')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-xs font-medium transition ${
+                    activeTab === 'general' ? 'bg-slate-800 text-amber-400' : 'text-slate-400 hover:bg-slate-800'
+                  }`}
+                >
+                  General Settings
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('fares')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-xs font-medium transition ${
+                    activeTab === 'fares' ? 'bg-slate-800 text-amber-400' : 'text-slate-400 hover:bg-slate-800'
+                  }`}
+                >
+                  <CreditCard className="w-4 h-4" /> Live Pricing Management
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('app-icon')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-xs font-medium transition ${
+                    activeTab === 'app-icon' ? 'bg-slate-800 text-amber-400' : 'text-slate-400 hover:bg-slate-800'
+                  }`}
+                >
+                  <Image className="w-4 h-4" /> Mobile App Icon
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('passenger-website')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left text-xs font-medium transition ${
+                    activeTab === 'passenger-website' ? 'bg-slate-800 text-amber-400' : 'text-slate-400 hover:bg-slate-800'
+                  }`}
+                >
+                  <Globe className="w-4 h-4" /> Passenger Website
+                </button>
+              </div>
+            )}
             <button
               type="button"
               onClick={() => setActiveTab('drivers')}
@@ -208,24 +231,6 @@ export default function AdminDashboard({ onLogout, onAuthError, adminName }) {
               }`}
             >
               <MapPin className="w-4 h-4" /> Driver Location Map
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('app-icon')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition ${
-                activeTab === 'app-icon' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/10' : 'text-slate-400 hover:bg-slate-800'
-              }`}
-            >
-              <Image className="w-4 h-4" /> Mobile App Icon
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('passenger-website')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition ${
-                activeTab === 'passenger-website' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/10' : 'text-slate-400 hover:bg-slate-800'
-              }`}
-            >
-              <Globe className="w-4 h-4" /> Passenger Website
             </button>
             <button
               type="button"

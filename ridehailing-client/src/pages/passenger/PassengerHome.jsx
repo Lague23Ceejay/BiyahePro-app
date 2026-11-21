@@ -15,9 +15,12 @@ import {
   X,
 } from 'lucide-react';
 import { API_BASE } from '../../lib/api';
+import HoloCard from '../../components/effects/HoloCard';
+import SpecularButton from '../../components/effects/SpecularButton';
 import {
   DEFAULT_PASSENGER_WEBSITE_CONTENT,
   normalizePassengerWebsiteContent,
+  resolveWebsiteImageUrl,
   safeWebsiteUrl,
 } from '../../data/passengerWebsiteContent';
 import './PassengerHome.css';
@@ -84,11 +87,11 @@ export default function PassengerHome() {
     setMeta('og:title', title, 'property');
     setMeta('og:description', description, 'property');
     setMeta('og:type', 'website', 'property');
-    setMeta('og:image', safeWebsiteUrl(content.hero.imageUrl), 'property');
+    setMeta('og:image', resolveWebsiteImageUrl(content.hero.imageUrl), 'property');
     setMeta('twitter:card', 'summary_large_image');
     setMeta('twitter:title', title);
     setMeta('twitter:description', description);
-    setMeta('twitter:image', safeWebsiteUrl(content.hero.imageUrl));
+    setMeta('twitter:image', resolveWebsiteImageUrl(content.hero.imageUrl));
     let canonical = document.head.querySelector('link[rel="canonical"]');
     if (!canonical) {
       canonical = document.createElement('link');
@@ -136,9 +139,16 @@ export default function PassengerHome() {
     setMenuOpen(false);
   }
 
-  const heroImage = safeWebsiteUrl(content.hero.imageUrl);
-  const aboutImage = safeWebsiteUrl(content.about.imageUrl);
-  const qrImage = safeWebsiteUrl(content.download.qrImageUrl);
+  function scrollToDownload() {
+    document.getElementById('download')?.scrollIntoView({
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      block: 'start',
+    });
+  }
+
+  const heroImage = resolveWebsiteImageUrl(content.hero.imageUrl);
+  const aboutImage = resolveWebsiteImageUrl(content.about.imageUrl);
+  const qrImage = resolveWebsiteImageUrl(content.download.qrImageUrl);
 
   return (
     <main className="passenger-site">
@@ -166,7 +176,25 @@ export default function PassengerHome() {
           <h1>{content.hero.title}</h1>
           <p className="hero-description">{content.hero.description}</p>
           <div className="hero-actions">
-            <a className="button button-dark" href="#download">Explore the app <ArrowRight size={17} aria-hidden="true" /></a>
+            <SpecularButton
+              size="sm"
+              radius={999}
+              tint="#17130f"
+              tintOpacity={1}
+              textColor="#fff"
+              lineColor="#f4b844"
+              baseColor="#7b5622"
+              idleIntensity={0.2}
+              shineSize={12}
+              shineFade={36}
+              thickness={1.3}
+              glow={0.35}
+              proximity={150}
+              className="hero-primary-cta"
+              onClick={scrollToDownload}
+            >
+              Explore the app <ArrowRight size={17} aria-hidden="true" />
+            </SpecularButton>
             <a className="button button-outline" href="#rides">See ride options <ArrowDown size={16} aria-hidden="true" /></a>
           </div>
           <div className="hero-location"><MapPin size={17} aria-hidden="true" /><span>Serving Dapitan City, Zamboanga del Norte</span></div>
@@ -202,8 +230,8 @@ export default function PassengerHome() {
           {content.services.cards.map((card, index) => (
             <article className={`service-card service-card-${index % 2}`} key={`${card.title}-${index}`}>
               <div className={`service-image${safeWebsiteUrl(card.imageUrl) ? ' has-image' : ''}`}>
-                {safeWebsiteUrl(card.imageUrl)
-                  ? <img src={safeWebsiteUrl(card.imageUrl)} alt={card.imageAlt} loading="lazy" />
+                {resolveWebsiteImageUrl(card.imageUrl)
+                  ? <img src={resolveWebsiteImageUrl(card.imageUrl)} alt={card.imageAlt} loading="lazy" />
                   : <div className="service-image-placeholder" aria-hidden="true"><span className="service-orb" /><span className="service-road" /><span className="service-vehicle"><Bike /></span></div>}
                 <span className="image-label"><Bike size={14} aria-hidden="true" /> RIDE IN DAPITAN</span>
               </div>
@@ -240,9 +268,27 @@ export default function PassengerHome() {
       </section>
 
       <section className="about-section section-wrap" id="about" data-reveal>
-        <div className={`about-visual${aboutImage ? ' has-image' : ''}`}>
+        <div className={`about-visual${aboutImage ? ' has-holo-card' : ''}`}>
           {aboutImage
-            ? <img src={aboutImage} alt={content.about.imageAlt} loading="lazy" />
+            ? <HoloCard
+              image={aboutImage}
+              alt={content.about.imageAlt}
+              width={240}
+              radius={22}
+              intensity={0.65}
+              edgeSparkle={0.35}
+              glare={0.28}
+              tiltMax={7}
+              hoverScale={1.015}
+              idle={false}
+              shadow={false}
+              className="about-holo-card"
+              style={{
+                '--hc-w': 'min(240px, 75vw)',
+                aspectRatio: 'auto',
+                height: 'min(340px, 55vh)',
+              }}
+            />
             : <div className="about-app-card" aria-hidden="true">
               <span className="about-app-brand"><span className="brand-mark"><Bike /></span> BiyahePro</span>
               <span className="about-app-label">YOUR RIDE, YOUR ROUTE</span>

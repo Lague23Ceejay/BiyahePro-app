@@ -4,6 +4,7 @@ import { apiFetch } from '../../lib/api';
 import {
   DEFAULT_PASSENGER_WEBSITE_CONTENT,
   normalizePassengerWebsiteContent,
+  resolveWebsiteImageUrl,
   safeWebsiteUrl,
 } from '../../data/passengerWebsiteContent';
 
@@ -81,15 +82,9 @@ export default function PassengerWebsiteEditor({ onAuthError }) {
     event.preventDefault();
     setError('');
     setMessage('');
-    const imageUrls = [
-      content.hero.imageUrl,
-      content.about.imageUrl,
-      content.download.qrImageUrl,
-      ...content.services.cards.map(card => card.imageUrl),
-    ];
     const appUrls = [content.download.androidUrl, content.download.iosUrl];
-    if ([...imageUrls, ...appUrls].some(url => url && !safeWebsiteUrl(url))) {
-      setError('Use a valid http(s) URL or a same-site path for images and download links.');
+    if (appUrls.some(url => url && !safeWebsiteUrl(url))) {
+      setError('Use a valid http(s) URL for app download links.');
       return;
     }
     setSaving(true);
@@ -139,18 +134,19 @@ export default function PassengerWebsiteEditor({ onAuthError }) {
           <Field label="Eyebrow" value={content.hero.eyebrow} onChange={value => updateField(['hero', 'eyebrow'], value)} />
           <Field label="Headline" value={content.hero.title} onChange={value => updateField(['hero', 'title'], value)} />
           <Field label="Description" value={content.hero.description} onChange={value => updateField(['hero', 'description'], value)} multiline />
-          <ImageField label="Hero image URL" value={content.hero.imageUrl} alt={content.hero.imageAlt} onChange={(value, alt) => { updateField(['hero', 'imageUrl'], value); updateField(['hero', 'imageAlt'], alt); }} />
+          <WebsiteImageUpload label="Hero image" assetKey={content.hero.imageAssetKey} value={content.hero.imageUrl} alt={content.hero.imageAlt} onChange={(value, alt) => { updateField(['hero', 'imageUrl'], value); updateField(['hero', 'imageAlt'], alt); }} onAuthError={onAuthError} />
         </EditorSection>
 
         <CardSection
           title="Ride option cards"
-          description="Use image URLs from your website or a publicly accessible image host."
+          description="Upload an optional image for each ride card."
           cards={content.services.cards}
-          fields={['title', 'subtitle', 'description', 'imageUrl']}
-          labels={{ title: 'Card title', subtitle: 'Short label', description: 'Card description', imageUrl: 'Image URL' }}
+          fields={['title', 'subtitle', 'description', 'image']}
+          labels={{ title: 'Card title', subtitle: 'Short label', description: 'Card description' }}
           onChange={(index, field, value) => updateCard(['services', 'cards'], index, field, value)}
-          onAdd={() => addCard(['services', 'cards'], { title: '', subtitle: '', description: '', imageUrl: '', imageAlt: '' })}
+          onAdd={() => addCard(['services', 'cards'], { title: '', subtitle: '', description: '', imageAssetKey: `service-card-${crypto.randomUUID()}`, imageUrl: '', imageAlt: '' })}
           onRemove={index => removeCard(['services', 'cards'], index)}
+          onAuthError={onAuthError}
         />
         <Field label="Ride options heading" value={content.services.heading} onChange={value => updateField(['services', 'heading'], value)} />
         <Field label="Ride options introduction" value={content.services.description} onChange={value => updateField(['services', 'description'], value)} multiline />
@@ -181,7 +177,7 @@ export default function PassengerWebsiteEditor({ onAuthError }) {
         <EditorSection title="About BiyahePro">
           <Field label="Heading" value={content.about.heading} onChange={value => updateField(['about', 'heading'], value)} />
           <Field label="Description" value={content.about.description} onChange={value => updateField(['about', 'description'], value)} multiline />
-          <ImageField label="About image URL" value={content.about.imageUrl} alt={content.about.imageAlt} onChange={(value, alt) => { updateField(['about', 'imageUrl'], value); updateField(['about', 'imageAlt'], alt); }} />
+          <WebsiteImageUpload label="About image" assetKey={content.about.imageAssetKey} value={content.about.imageUrl} alt={content.about.imageAlt} onChange={(value, alt) => { updateField(['about', 'imageUrl'], value); updateField(['about', 'imageAlt'], alt); }} onAuthError={onAuthError} />
         </EditorSection>
 
         <CardSection
@@ -194,11 +190,11 @@ export default function PassengerWebsiteEditor({ onAuthError }) {
           onRemove={index => removeCard(['faqs'], index)}
         />
 
-        <EditorSection title="App download and QR code" description="Set a direct QR image URL and the official store or download links. Leave a URL blank to hide its button.">
+        <EditorSection title="App download and QR code" description="Upload the app download QR image and add official store or download links.">
           <Field label="Download section heading" value={content.download.heading} onChange={value => updateField(['download', 'heading'], value)} />
           <Field label="Description" value={content.download.description} onChange={value => updateField(['download', 'description'], value)} multiline />
           <Field label="App name" value={content.download.appTitle} onChange={value => updateField(['download', 'appTitle'], value)} />
-          <ImageField label="QR code image URL" value={content.download.qrImageUrl} alt={content.download.qrImageAlt} onChange={(value, alt) => { updateField(['download', 'qrImageUrl'], value); updateField(['download', 'qrImageAlt'], alt); }} />
+          <WebsiteImageUpload label="App download QR code" assetKey={content.download.imageAssetKey} value={content.download.qrImageUrl} alt={content.download.qrImageAlt} onChange={(value, alt) => { updateField(['download', 'qrImageUrl'], value); updateField(['download', 'qrImageAlt'], alt); }} onAuthError={onAuthError} />
           <Field label="Android download URL" value={content.download.androidUrl} onChange={value => updateField(['download', 'androidUrl'], value)} />
           <Field label="iPhone download URL" value={content.download.iosUrl} onChange={value => updateField(['download', 'iosUrl'], value)} />
         </EditorSection>
@@ -233,20 +229,100 @@ function Field({ label, value, onChange, multiline = false }) {
   </label>;
 }
 
-function ImageField({ label, value, alt, onChange }) {
-  const preview = safeWebsiteUrl(value);
+function WebsiteImageUpload({ label, assetKey, value, alt, onChange, onAuthError }) {
+  const [exists, setExists] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [previewUrl, setPreviewUrl] = useState('');
+  const imageEndpoint = `/api/branding/website-image/${assetKey}`;
+  const preview = previewUrl || resolveWebsiteImageUrl(value);
+
+  useEffect(() => {
+    let active = true;
+    apiFetch(imageEndpoint, { method: 'HEAD' })
+      .then(response => {
+        if (active) setExists(response.ok);
+      })
+      .catch(fetchError => {
+        if (fetchError.isAuthError) onAuthError?.();
+        else if (active && value?.startsWith('asset:')) setError('Unable to check the uploaded image.');
+      });
+    return () => { active = false; };
+  }, [imageEndpoint, onAuthError, value]);
+
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
+
+  async function uploadImage(event) {
+    const file = event.target.files?.[0];
+    setError('');
+    setMessage('');
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      setError('Choose a PNG, JPEG, or WebP image.');
+      event.target.value = '';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Website images must be 5 MB or smaller.');
+      event.target.value = '';
+      return;
+    }
+
+    const localPreview = URL.createObjectURL(file);
+    setPreviewUrl(previous => {
+      if (previous) URL.revokeObjectURL(previous);
+      return localPreview;
+    });
+    setUploading(true);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const response = await apiFetch(imageEndpoint, { method: 'PUT', body });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.message || 'Unable to upload this image.');
+      }
+      onChange(`asset:${assetKey}:${Date.now()}`, alt);
+      setExists(true);
+      setMessage('Image uploaded. Save and publish to update the homepage content.');
+    } catch (uploadError) {
+      if (uploadError.isAuthError) { onAuthError?.(); return; }
+      setError(uploadError instanceof Error ? uploadError.message : 'Unable to upload this image.');
+      setPreviewUrl(previous => {
+        if (previous) URL.revokeObjectURL(previous);
+        return '';
+      });
+    } finally {
+      setUploading(false);
+      event.target.value = '';
+    }
+  }
+
   return <div className="sm:col-span-2">
-    <Field label={label} value={value} onChange={next => onChange(next, alt)} />
-    <div className="mt-2 flex items-center gap-3">
+    <div className="flex flex-wrap items-end gap-4">
       <div className="grid h-20 w-28 place-items-center overflow-hidden rounded-lg border border-slate-700 bg-slate-950">
-        {preview ? <img src={preview} alt="Image preview" className="h-full w-full object-cover" /> : <Image className="h-5 w-5 text-slate-600" />}
+        {preview
+          ? <img src={preview} alt={`${label} preview`} className="h-full w-full object-cover" onError={() => setExists(false)} />
+          : <Image className="h-5 w-5 text-slate-600" />}
       </div>
-      <Field label="Image alt text" value={alt} onChange={next => onChange(value, next)} />
+      <div className="min-w-52 flex-1">
+        <label className="block text-xs font-semibold text-slate-300">{label}
+          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={uploadImage} disabled={uploading} className="mt-1 block w-full text-sm text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-amber-500 file:px-3 file:py-2 file:font-semibold file:text-slate-950 hover:file:bg-amber-400 disabled:opacity-60" />
+        </label>
+        <p className="mt-1 text-[11px] text-slate-500">PNG, JPEG or WebP · up to 5 MB · {exists ? 'An image is uploaded' : 'No image uploaded yet'}</p>
+      </div>
+      <div className="min-w-48 flex-1"><Field label="Image alt text" value={alt} onChange={next => onChange(value, next)} /></div>
     </div>
+    {uploading && <p role="status" className="mt-2 text-xs text-amber-300">Uploading image…</p>}
+    {error && <p role="alert" className="mt-2 text-xs text-red-300">{error}</p>}
+    {message && <p role="status" className="mt-2 text-xs text-emerald-300">{message}</p>}
   </div>;
 }
 
-function CardSection({ title, description, cards, fields, labels, onChange, onAdd, onRemove }) {
+function CardSection({ title, description, cards, fields, labels, onChange, onAdd, onRemove, onAuthError }) {
   return <EditorSection title={title} description={description}>
     {cards.map((card, index) => <div key={index} className="relative space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:col-span-2">
       <div className="flex items-center justify-between">
@@ -254,8 +330,8 @@ function CardSection({ title, description, cards, fields, labels, onChange, onAd
         <button type="button" onClick={() => onRemove(index)} aria-label={`Remove card ${index + 1}`} className="rounded-lg p-2 text-slate-500 hover:bg-red-950/40 hover:text-red-300"><Trash2 className="h-4 w-4" /></button>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        {fields.map(field => field === 'imageUrl'
-          ? <ImageField key={field} label={labels[field]} value={card[field]} alt={card.imageAlt} onChange={(value, alt) => { onChange(index, 'imageUrl', value); onChange(index, 'imageAlt', alt); }} />
+        {fields.map(field => field === 'image'
+          ? <WebsiteImageUpload key={field} label="Ride image" assetKey={card.imageAssetKey} value={card.imageUrl} alt={card.imageAlt} onChange={(value, alt) => { onChange(index, 'imageUrl', value); onChange(index, 'imageAlt', alt); }} onAuthError={onAuthError} />
           : <Field key={field} label={labels[field]} value={card[field]} onChange={value => onChange(index, field, value)} multiline={['description', 'answer'].includes(field)} />)}
       </div>
     </div>)}

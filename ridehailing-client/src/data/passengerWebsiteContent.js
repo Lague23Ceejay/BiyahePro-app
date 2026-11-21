@@ -1,3 +1,5 @@
+import { API_BASE } from '../lib/api';
+
 export const DEFAULT_PASSENGER_WEBSITE_CONTENT = {
   seo: {
     title: 'BiyahePro | Motorcycle and Motorcab Rides in Dapitan City',
@@ -8,6 +10,7 @@ export const DEFAULT_PASSENGER_WEBSITE_CONTENT = {
     eyebrow: 'LOCAL RIDES, MADE SIMPLE',
     title: 'Your next ride around Dapitan starts here.',
     description: 'Book a motorcycle or motorcab, choose your pickup and destination, and review your estimated fare in the BiyahePro passenger app.',
+    imageAssetKey: 'website-hero',
     imageUrl: '',
     imageAlt: 'BiyahePro passenger rides in Dapitan City',
   },
@@ -19,6 +22,7 @@ export const DEFAULT_PASSENGER_WEBSITE_CONTENT = {
         title: 'Motorcycle',
         subtitle: 'A practical ride for everyday trips',
         description: 'Set your pickup and destination, review the fare estimate, and request a motorcycle ride from the app.',
+        imageAssetKey: 'service-card-motorcycle',
         imageUrl: '',
         imageAlt: 'Motorcycle ride available in the BiyahePro app',
       },
@@ -26,6 +30,7 @@ export const DEFAULT_PASSENGER_WEBSITE_CONTENT = {
         title: 'Motorcab / Baobao',
         subtitle: 'A motorcab option in the same app',
         description: 'Choose a motorcab when it suits your trip. Your available ride options and fare estimate appear before you confirm.',
+        imageAssetKey: 'service-card-motorcab',
         imageUrl: '',
         imageAlt: 'Motorcab ride available in the BiyahePro app',
       },
@@ -52,6 +57,7 @@ export const DEFAULT_PASSENGER_WEBSITE_CONTENT = {
   about: {
     heading: 'Built for getting around Dapitan.',
     description: 'BiyahePro is a passenger ride-booking app for motorcycle and motorcab trips. Set your pickup and destination, check the fare estimate, and book with trip details in one place.',
+    imageAssetKey: 'website-about',
     imageUrl: '',
     imageAlt: 'BiyahePro passenger app ride booking screen',
   },
@@ -64,6 +70,7 @@ export const DEFAULT_PASSENGER_WEBSITE_CONTENT = {
   download: {
     heading: 'Ready to book your next ride?',
     description: 'Get the BiyahePro passenger app to check available rides and fares around Dapitan.',
+    imageAssetKey: 'website-download-qr',
     qrImageUrl: '',
     qrImageAlt: 'Scan to get the BiyahePro passenger app',
     appTitle: 'BiyahePro passenger app',
@@ -72,11 +79,17 @@ export const DEFAULT_PASSENGER_WEBSITE_CONTENT = {
   },
 };
 
-function normalizeCards(value, defaults) {
+function normalizeCards(value, defaults, includeImageKeys = false) {
   if (!Array.isArray(value)) return defaults;
   return value
     .filter(card => card && typeof card === 'object')
-    .map((card, index) => ({ ...(defaults[index] || {}), ...card }));
+    .map((card, index) => ({
+      ...(defaults[index] || {}),
+      ...card,
+      ...(includeImageKeys && typeof card.imageAssetKey !== 'string'
+        ? { imageAssetKey: defaults[index]?.imageAssetKey || `service-card-legacy-${index}` }
+        : {}),
+    }));
 }
 
 export function normalizePassengerWebsiteContent(value) {
@@ -90,7 +103,11 @@ export function normalizePassengerWebsiteContent(value) {
     };
   }
   for (const section of ['services', 'steps', 'features']) {
-    content[section].cards = normalizeCards(value[section]?.cards, DEFAULT_PASSENGER_WEBSITE_CONTENT[section].cards);
+    content[section].cards = normalizeCards(
+      value[section]?.cards,
+      DEFAULT_PASSENGER_WEBSITE_CONTENT[section].cards,
+      section === 'services',
+    );
   }
   content.faqs = normalizeCards(value.faqs, DEFAULT_PASSENGER_WEBSITE_CONTENT.faqs);
   return content;
@@ -106,4 +123,14 @@ export function safeWebsiteUrl(value) {
   } catch {
     return '';
   }
+}
+
+export function resolveWebsiteImageUrl(value) {
+  if (typeof value !== 'string') return '';
+  const asset = /^asset:([a-z0-9-]{1,60})(?::(\d+))?$/.exec(value);
+  if (asset) {
+    const url = `${API_BASE}/api/branding/website-image/${asset[1]}`;
+    return asset[2] ? `${url}?v=${asset[2]}` : url;
+  }
+  return safeWebsiteUrl(value);
 }

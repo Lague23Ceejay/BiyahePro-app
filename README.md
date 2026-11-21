@@ -92,7 +92,8 @@ BiyahePro - new/                                    ← Root Workspace Directory
 │   ├── 17_app_icon.sql                           ← Database-backed mobile launcher icons
 │   ├── 18_separate_app_icons.sql                  ← Independent customer and driver icons
 │   ├── 19_dapitan_service_area_defaults.sql       ← Dapitan defaults; preserve customized area
-│   └── 20_passenger_website_content.sql           ← Public homepage CMS content
+│   ├── 20_passenger_website_content.sql           ← Public homepage CMS content
+│   └── 21_passenger_website_assets.sql            ← Uploaded homepage images and QR code
 │
 └── RideHailing.API/                               ← Phase 2: ASP.NET Core Web API
     ├── Program.cs                                 ← Application entry & DI container
@@ -158,13 +159,14 @@ BiyahePro - new/                                    ← Root Workspace Directory
 ### Passenger-facing website
 
 - The browser client serves a public passenger homepage at `/` and the existing admin dashboard at `/#admin`.
-- The Passenger Website admin tab edits homepage copy, SEO title/description/keywords, ride and feature cards, FAQs, image URLs, and the app QR image/store links. Content is saved in the public `website.passenger_content` app setting; apply `ridehailing-db/20_passenger_website_content.sql` to existing databases before editing.
+- The Passenger Website admin tab edits homepage copy, SEO title/description/keywords, ride and feature cards, FAQs, uploaded images, and the app QR image/store links. Content is saved in the public `website.passenger_content` app setting; apply `ridehailing-db/20_passenger_website_content.sql` to existing databases before editing.
+- Admins can upload homepage and ride-card images plus the app QR image as PNG, JPEG, or WebP (up to 5 MB each). Image files are stored in the API database; apply `ridehailing-db/21_passenger_website_assets.sql` before uploading.
 - Public content defaults to Dapitan City and the implemented motorcycle/motorcab options. Add the official QR image and app-store URLs when those download links are ready.
 - If the website is hosted on a different origin from the API, add its exact origin to the API's `Cors:AllowedOrigins` configuration (for example `Cors__AllowedOrigins__0=https://your-domain.example`).
 
 ### Database and deployment notes
 
-- New installations apply the SQL files in `ridehailing-db/` during database initialization. Existing databases must be upgraded manually with `15_official_zone_fares.sql`, `16_driver_location_monitoring.sql`, `17_app_icon.sql`, `18_separate_app_icons.sql`, `19_dapitan_service_area_defaults.sql`, and `20_passenger_website_content.sql` before using the corresponding features. Migration 18 copies any existing shared icon into both app-specific records; migration 19 updates the old service-area defaults only if the center and radius are still untouched legacy values, preserving admin customization.
+- New installations apply the SQL files in `ridehailing-db/` during database initialization. Existing databases must be upgraded manually with `15_official_zone_fares.sql`, `16_driver_location_monitoring.sql`, `17_app_icon.sql`, `18_separate_app_icons.sql`, `19_dapitan_service_area_defaults.sql`, `20_passenger_website_content.sql`, and `21_passenger_website_assets.sql` before using the corresponding features. Migration 18 copies any existing shared icon into both app-specific records; migration 19 updates the old service-area defaults only if the center and radius are still untouched legacy values, preserving admin customization.
 - Development verification covered the API build, admin build, and customer/driver TypeScript checks. Live database-backed booking and successful remote EAS builds still need to be verified in the target environment.
 
 ---
@@ -227,7 +229,7 @@ Then open:
 
 The API waits for the database health check before starting. The database initialization scripts in `ridehailing-db/` run automatically only when PostgreSQL initializes a new data directory. The scripts are mounted at `/docker-entrypoint-initdb.d` inside the database container and are executed in filename order.
 
-Official destination fares and driver-verified SP/SC discounts require `ridehailing-db/15_official_zone_fares.sql`. The admin Driver Location Map requires `ridehailing-db/16_driver_location_monitoring.sql`. The admin Mobile App Icon section requires `ridehailing-db/17_app_icon.sql` and `ridehailing-db/18_separate_app_icons.sql`. For the Dapitan service-area default and booking boundary, apply `ridehailing-db/19_dapitan_service_area_defaults.sql`. The Passenger Website admin tab requires `ridehailing-db/20_passenger_website_content.sql`. On an existing database, apply the relevant migrations manually; Docker does not rerun initialization scripts for an existing data directory. In Fare Pricing Management, admins can change the service-area circle and booking fee; the official fare list and 20% SP/SC discount remain fixed.
+Official destination fares and driver-verified SP/SC discounts require `ridehailing-db/15_official_zone_fares.sql`. The admin Driver Location Map requires `ridehailing-db/16_driver_location_monitoring.sql`. The admin Mobile App Icon section requires `ridehailing-db/17_app_icon.sql` and `ridehailing-db/18_separate_app_icons.sql`. For the Dapitan service-area default and booking boundary, apply `ridehailing-db/19_dapitan_service_area_defaults.sql`. The Passenger Website admin tab requires `ridehailing-db/20_passenger_website_content.sql` and `ridehailing-db/21_passenger_website_assets.sql`. On an existing database, apply the relevant migrations manually; Docker does not rerun initialization scripts for an existing data directory. In Fare Pricing Management, admins can change the service-area circle and booking fee; the official fare list and 20% SP/SC discount remain fixed.
 
 The admin Driver Location Map refreshes current and last-known driver coordinates every 10 seconds. Driver coordinates are reported while the driver app is in the foreground and location permission is enabled, including when no ride is active. It displays the latest point only; it does not save or replay historical movement routes. Drivers are notified in the app that operations can see their live location while they use the app.
 

@@ -3,6 +3,17 @@ import { RefreshCw, MapPin } from 'lucide-react';
 import { apiFetch } from '../../lib/api';
 import StatusBadge from '../ui/StatusBadge';
 
+const PRIORITY_STATUS_ORDER = {
+  requested: 0,
+  in_progress: 1,
+  accepted: 2,
+};
+
+function getRequestedAt(trip) {
+  const timestamp = new Date(trip.requestedAt).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 export default function LiveTrips({ onAuthError }) {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,12 +56,42 @@ export default function LiveTrips({ onAuthError }) {
     };
   }, [refreshKey, onAuthError]);
 
+  const sortedTrips = [...trips].sort((first, second) => {
+    const firstPriority = PRIORITY_STATUS_ORDER[first.status] ?? Number.MAX_SAFE_INTEGER;
+    const secondPriority = PRIORITY_STATUS_ORDER[second.status] ?? Number.MAX_SAFE_INTEGER;
+    if (firstPriority !== secondPriority) return firstPriority - secondPriority;
+    return getRequestedAt(second) - getRequestedAt(first);
+  });
+  const priorityTrips = sortedTrips.filter((trip) => trip.status in PRIORITY_STATUS_ORDER);
+  const recentTrips = sortedTrips.filter((trip) => !(trip.status in PRIORITY_STATUS_ORDER));
+
+  const renderTrip = (trip) => (
+    <tr key={trip.id} className="hover:bg-slate-800/20 transition">
+      <td className="p-4 font-medium">{trip.customerName || 'Passenger'}</td>
+      <td className="p-4 text-slate-300">{trip.driverName || 'Searching...'}</td>
+      <td className="p-4 space-y-1">
+        <div className="flex items-center gap-2 text-slate-300">
+          <MapPin className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+          <span className="truncate max-w-[200px]">{trip.pickupAddress}</span>
+        </div>
+        <div className="flex items-center gap-2 text-slate-400">
+          <MapPin className="w-3.5 h-3.5 text-green-400 shrink-0" />
+          <span className="truncate max-w-[200px]">{trip.dropoffAddress}</span>
+        </div>
+      </td>
+      <td className="p-4 font-mono font-semibold text-amber-400">₱{trip.fareAmount}</td>
+      <td className="p-4">
+        <StatusBadge status={trip.status} />
+      </td>
+    </tr>
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-xl font-bold">Live System Trips</h2>
-          <p className="text-slate-400 text-sm mt-0.5">Monitor active bookings flowing through the ecosystem</p>
+          <h2 className="text-xl font-bold">Rides</h2>
+          <p className="text-slate-400 text-sm mt-0.5">High-priority ride statuses first, followed by recent ride history.</p>
         </div>
         <button
           onClick={() => setRefreshKey((key) => key + 1)}
@@ -79,26 +120,26 @@ export default function LiveTrips({ onAuthError }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {trips.map((trip) => (
-                <tr key={trip.id} className="hover:bg-slate-800/20 transition">
-                  <td className="p-4 font-medium">{trip.customerName || 'Passenger'}</td>
-                  <td className="p-4 text-slate-300">{trip.driverName || 'Searching...'}</td>
-                  <td className="p-4 space-y-1">
-                    <div className="flex items-center gap-2 text-slate-300">
-                      <MapPin className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                      <span className="truncate max-w-[200px]">{trip.pickupAddress}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-slate-400">
-                      <MapPin className="w-3.5 h-3.5 text-green-400 shrink-0" />
-                      <span className="truncate max-w-[200px]">{trip.dropoffAddress}</span>
-                    </div>
-                  </td>
-                  <td className="p-4 font-mono font-semibold text-amber-400">₱{trip.fareAmount}</td>
-                  <td className="p-4">
-                    <StatusBadge status={trip.status} />
-                  </td>
-                </tr>
-              ))}
+              {priorityTrips.length > 0 && (
+                <>
+                  <tr className="bg-amber-500/10 text-amber-300">
+                    <th colSpan="5" className="px-4 py-3 text-left text-xs uppercase tracking-wide">
+                      High Priority · Requested, In Progress, Accepted
+                    </th>
+                  </tr>
+                  {priorityTrips.map(renderTrip)}
+                </>
+              )}
+              {recentTrips.length > 0 && (
+                <>
+                  <tr className="bg-slate-950/60 text-slate-300">
+                    <th colSpan="5" className="px-4 py-3 text-left text-xs uppercase tracking-wide">
+                      Recent Rides
+                    </th>
+                  </tr>
+                  {recentTrips.map(renderTrip)}
+                </>
+              )}
             </tbody>
           </table>
         </div>
