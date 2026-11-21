@@ -167,6 +167,8 @@ const link = gl => {
 };
 
 const SpecularButton = ({
+  as = 'button',
+  href,
   children = 'Get Started',
   size = 'lg',
   radius = 18,
@@ -196,6 +198,7 @@ const SpecularButton = ({
   const buttonRef = useRef(null);
   const canvasRef = useRef(null);
   const wakeRef = useRef(null);
+  const Element = as;
   const settings = useMemo(() => ({
     radius: Math.max(0, radius),
     lineColor: String(lineColor),
@@ -429,12 +432,14 @@ const SpecularButton = ({
     };
   }, []);
 
+  const elementProps = as === 'a'
+    ? { href, onClick }
+    : { type, disabled, onClick };
+
   return (
-    <button
+    <Element
       ref={buttonRef}
-      type={type}
-      disabled={disabled}
-      onClick={onClick}
+      {...elementProps}
       className={`specular-button specular-button--${size}${className ? ` ${className}` : ''}`}
       style={{
         '--sb-radius': `${radius}px`,
@@ -448,7 +453,7 @@ const SpecularButton = ({
     >
       <canvas ref={canvasRef} className="specular-button__light" aria-hidden="true" />
       <span className="specular-button__label">{children}</span>
-    </button>
+    </Element>
   );
 };
 

@@ -15,7 +15,6 @@ import {
   X,
 } from 'lucide-react';
 import { API_BASE } from '../../lib/api';
-import HoloCard from '../../components/effects/HoloCard';
 import SpecularButton from '../../components/effects/SpecularButton';
 import {
   DEFAULT_PASSENGER_WEBSITE_CONTENT,
@@ -28,6 +27,13 @@ import './PassengerHome.css';
 const CONTENT_SETTING_KEY = 'website.passenger_content';
 
 const featureIcons = [Wallet, MapPin, Navigation, Check];
+const specularSurfaceHandlers = {
+  onPointerEnter: updateSpecularLight,
+  onPointerMove: updateSpecularLight,
+  onPointerDown: updateSpecularLight,
+  onPointerUp: resetSpecularLight,
+  onPointerLeave: resetSpecularLight,
+};
 
 export default function PassengerHome() {
   const [content, setContent] = useState(DEFAULT_PASSENGER_WEBSITE_CONTENT);
@@ -139,13 +145,6 @@ export default function PassengerHome() {
     setMenuOpen(false);
   }
 
-  function scrollToDownload() {
-    document.getElementById('download')?.scrollIntoView({
-      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-      block: 'start',
-    });
-  }
-
   const heroImage = resolveWebsiteImageUrl(content.hero.imageUrl);
   const aboutImage = resolveWebsiteImageUrl(content.about.imageUrl);
   const qrImage = resolveWebsiteImageUrl(content.download.qrImageUrl);
@@ -167,7 +166,7 @@ export default function PassengerHome() {
           <a href="#faq" onClick={closeMenu}>FAQs</a>
         </nav>
         <a className="button button-outline header-help" href="#faq">Get help <CircleHelp size={16} aria-hidden="true" /></a>
-        <a className="button button-primary header-download" href="#download">Get the app <QrCode size={17} aria-hidden="true" /></a>
+        <SpecularLink href="#download" className="header-download">Get the app <QrCode size={17} aria-hidden="true" /></SpecularLink>
       </header>
 
       <section className="hero-section section-wrap" id="top" data-reveal>
@@ -176,32 +175,16 @@ export default function PassengerHome() {
           <h1>{content.hero.title}</h1>
           <p className="hero-description">{content.hero.description}</p>
           <div className="hero-actions">
-            <SpecularButton
-              size="sm"
-              radius={999}
-              tint="#17130f"
-              tintOpacity={1}
-              textColor="#fff"
-              lineColor="#f4b844"
-              baseColor="#7b5622"
-              idleIntensity={0.2}
-              shineSize={12}
-              shineFade={36}
-              thickness={1.3}
-              glow={0.35}
-              proximity={150}
-              className="hero-primary-cta"
-              onClick={scrollToDownload}
-            >
+            <SpecularLink href="#download" variant="dark" className="hero-primary-cta">
               Explore the app <ArrowRight size={17} aria-hidden="true" />
-            </SpecularButton>
-            <a className="button button-outline" href="#rides">See ride options <ArrowDown size={16} aria-hidden="true" /></a>
+            </SpecularLink>
+            <SpecularLink href="#rides" variant="outline" className="hero-secondary-cta">See ride options <ArrowDown size={16} aria-hidden="true" /></SpecularLink>
           </div>
           <div className="hero-location"><MapPin size={17} aria-hidden="true" /><span>Serving Dapitan City, Zamboanga del Norte</span></div>
         </div>
-        <div className={`hero-art${heroImage ? ' has-image' : ''}`}>
+        <div className={`hero-art specular-surface${heroImage ? ' has-image' : ''}`} {...specularSurfaceHandlers}>
           {heroImage
-            ? <img src={heroImage} alt={content.hero.imageAlt} />
+            ? <SpecularPhoto image={heroImage} alt={content.hero.imageAlt} className="hero-photo-specular" />
             : <div className="hero-art-default" aria-hidden="true">
               <span className="hero-sun" />
               <span className="hero-road" />
@@ -227,11 +210,13 @@ export default function PassengerHome() {
           <p>{content.services.description}</p>
         </div>
         <div className="service-grid">
-          {content.services.cards.map((card, index) => (
+          {content.services.cards.map((card, index) => {
+            const image = resolveWebsiteImageUrl(card.imageUrl);
+            return (
             <article className={`service-card service-card-${index % 2}`} key={`${card.title}-${index}`}>
-              <div className={`service-image${safeWebsiteUrl(card.imageUrl) ? ' has-image' : ''}`}>
-                {resolveWebsiteImageUrl(card.imageUrl)
-                  ? <img src={resolveWebsiteImageUrl(card.imageUrl)} alt={card.imageAlt} loading="lazy" />
+              <div className={`service-image specular-surface${image ? ' has-image' : ''}`} {...specularSurfaceHandlers}>
+                {image
+                  ? <SpecularPhoto image={image} alt={card.imageAlt} className="service-photo-specular" />
                   : <div className="service-image-placeholder" aria-hidden="true"><span className="service-orb" /><span className="service-road" /><span className="service-vehicle"><Bike /></span></div>}
                 <span className="image-label"><Bike size={14} aria-hidden="true" /> RIDE IN DAPITAN</span>
               </div>
@@ -241,13 +226,14 @@ export default function PassengerHome() {
                 <a href="#download" className="text-link">Check the app <ArrowRight size={16} aria-hidden="true" /></a>
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       </section>
 
       <section className="steps-section" id="how-it-works" data-reveal>
         <div className="section-wrap steps-layout">
-          <div className="steps-intro"><span className="eyebrow eyebrow-light">HOW IT WORKS</span><h2>{content.steps.heading}</h2><p>{content.steps.description}</p><a className="button button-primary" href="#download">Get the passenger app <ArrowRight size={17} aria-hidden="true" /></a></div>
+          <div className="steps-intro"><span className="eyebrow eyebrow-light">HOW IT WORKS</span><h2>{content.steps.heading}</h2><p>{content.steps.description}</p><SpecularLink href="#download">Get the passenger app <ArrowRight size={17} aria-hidden="true" /></SpecularLink></div>
           <div className="steps-list">
             {content.steps.cards.map((step, index) => <article className="step-card" key={`${step.title}-${index}`}><span className="step-index">0{index + 1}</span><div><h3>{step.title}</h3><p>{step.description}</p></div><ArrowRight className="step-arrow" size={18} aria-hidden="true" /></article>)}
           </div>
@@ -268,27 +254,9 @@ export default function PassengerHome() {
       </section>
 
       <section className="about-section section-wrap" id="about" data-reveal>
-        <div className={`about-visual${aboutImage ? ' has-holo-card' : ''}`}>
+        <div className={`about-visual specular-surface${aboutImage ? ' has-image' : ''}`} {...specularSurfaceHandlers}>
           {aboutImage
-            ? <HoloCard
-              image={aboutImage}
-              alt={content.about.imageAlt}
-              width={240}
-              radius={22}
-              intensity={0.65}
-              edgeSparkle={0.35}
-              glare={0.28}
-              tiltMax={7}
-              hoverScale={1.015}
-              idle={false}
-              shadow={false}
-              className="about-holo-card"
-              style={{
-                '--hc-w': 'min(240px, 75vw)',
-                aspectRatio: 'auto',
-                height: 'min(340px, 55vh)',
-              }}
-            />
+            ? <SpecularPhoto image={aboutImage} alt={content.about.imageAlt} className="about-photo-specular" />
             : <div className="about-app-card" aria-hidden="true">
               <span className="about-app-brand"><span className="brand-mark"><Bike /></span> BiyahePro</span>
               <span className="about-app-label">YOUR RIDE, YOUR ROUTE</span>
@@ -309,7 +277,7 @@ export default function PassengerHome() {
       <section className="download-section" id="download" data-reveal>
         <div className="section-wrap download-layout">
           <div className="download-copy"><span className="eyebrow eyebrow-light">YOUR NEXT RIDE IS A FEW TAPS AWAY</span><h2>{content.download.heading}</h2><p>{content.download.description}</p><span className="download-location"><MapPin size={16} /> Dapitan City, Zamboanga del Norte</span></div>
-          <div className="download-card">
+          <div className="download-card specular-surface" {...specularSurfaceHandlers}>
             <div className="download-card-heading"><span className="download-device"><Smartphone size={19} /></span><span><small>GET STARTED</small><strong>{content.download.appTitle}</strong></span></div>
             {qrImage
               ? <div className="qr-frame"><img src={qrImage} alt={content.download.qrImageAlt} loading="lazy" /></div>
@@ -332,6 +300,61 @@ export default function PassengerHome() {
         <div className="section-wrap footer-bottom"><span>© {new Date().getFullYear()} BiyahePro</span><a href="#admin">Admin</a><span>Made for local rides in Dapitan City.</span></div>
       </footer>
     </main>
+  );
+}
+
+function SpecularPhoto({ image, alt, className }) {
+  return (
+    <div
+      role="img"
+      aria-label={alt || undefined}
+      className={`specular-photo ${className}`}
+    >
+      <img src={image} alt="" loading="lazy" decoding="async" />
+    </div>
+  );
+}
+
+function updateSpecularLight(event) {
+  const bounds = event.currentTarget.getBoundingClientRect();
+  if (!bounds.width || !bounds.height) return;
+  const x = Math.min(100, Math.max(0, ((event.clientX - bounds.left) / bounds.width) * 100));
+  const y = Math.min(100, Math.max(0, ((event.clientY - bounds.top) / bounds.height) * 100));
+  event.currentTarget.style.setProperty('--specular-x', `${x}%`);
+  event.currentTarget.style.setProperty('--specular-y', `${y}%`);
+  event.currentTarget.style.setProperty('--specular-opacity', '1');
+}
+
+function resetSpecularLight(event) {
+  event.currentTarget.style.setProperty('--specular-opacity', '.38');
+}
+
+function SpecularLink({ variant = 'primary', className = '', children, ...linkProps }) {
+  const isOutline = variant === 'outline';
+  const isDark = variant === 'dark';
+
+  return (
+    <SpecularButton
+      as="a"
+      size="sm"
+      radius={999}
+      tint={isOutline ? '#ffffff' : isDark ? '#17130f' : '#e98b00'}
+      tintOpacity={isOutline ? 0.54 : 1}
+      textColor={isDark ? '#ffffff' : '#17130f'}
+      lineColor="#f4b844"
+      baseColor="#7b5622"
+      intensity={1.35}
+      idleIntensity={0.48}
+      shineSize={12}
+      shineFade={36}
+      thickness={1.3}
+      glow={0.35}
+      proximity={150}
+      className={`passenger-specular-link passenger-specular-link--${variant}${className ? ` ${className}` : ''}`}
+      {...linkProps}
+    >
+      {children}
+    </SpecularButton>
   );
 }
 

@@ -66,7 +66,7 @@
 .specular-button__light {
   position: absolute;
   inset: -24px;
-  z-index: 1;
+  z-index: 0;
   display: block;
   width: calc(100% + 48px);
   height: calc(100% + 48px);
@@ -79,4 +79,6 @@
   display: inline-flex;
   align-items: center;
   gap: inherit;
+  color: var(--sb-text-color);
+  visibility: visible;
 }
