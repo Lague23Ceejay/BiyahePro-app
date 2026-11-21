@@ -326,7 +326,7 @@ function updateSpecularLight(event) {
 }
 
 function resetSpecularLight(event) {
-  event.currentTarget.style.setProperty('--specular-opacity', '.38');
+  event.currentTarget.style.setProperty('--specular-opacity', '.46');
 }
 
 function SpecularLink({ variant = 'primary', className = '', children, ...linkProps }) {
@@ -341,10 +341,10 @@ function SpecularLink({ variant = 'primary', className = '', children, ...linkPr
       tint={isOutline ? '#ffffff' : isDark ? '#17130f' : '#e98b00'}
       tintOpacity={isOutline ? 0.54 : 1}
       textColor={isDark ? '#ffffff' : '#17130f'}
-      lineColor="#f4b844"
-      baseColor="#7b5622"
-      intensity={1.35}
-      idleIntensity={0.48}
+      lineColor="#78c8ff"
+      baseColor="#174f8b"
+      intensity={1.65}
+      idleIntensity={0.65}
       shineSize={12}
       shineFade={36}
       thickness={1.3}

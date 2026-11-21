@@ -76,8 +76,8 @@ html.has-scroll-reveal .passenger-site [data-reveal].is-visible { opacity: 1; tr
   white-space: nowrap;
 }
 .passenger-site .passenger-specular-link:hover { transform: translateY(-2px); }
-.passenger-site .passenger-specular-link--primary { border-color: #d5aa5c; box-shadow: 0 8px 18px rgb(191 116 0 / 17%); }
-.passenger-site .passenger-specular-link--dark { border-color: #d5aa5c; box-shadow: 0 7px 22px rgb(191 116 0 / 24%), inset 0 1px 0 rgb(255 255 255 / 14%); }
+.passenger-site .passenger-specular-link--primary { border-color: #70b9ee; box-shadow: 0 8px 20px rgb(28 139 218 / 28%); }
+.passenger-site .passenger-specular-link--dark { border-color: #70b9ee; box-shadow: 0 7px 24px rgb(28 139 218 / 32%), inset 0 1px 0 rgb(255 255 255 / 14%); }
 .passenger-site .passenger-specular-link--outline { border-color: #ded4c6; }
 .passenger-site .passenger-specular-link--outline:hover { border-color: #c9b89f; }
 .passenger-site .hero-primary-cta .specular-button__label { gap: 10px; }
@@ -121,7 +121,7 @@ html.has-scroll-reveal .passenger-site [data-reveal].is-visible { opacity: 1; tr
   isolation: isolate;
   --specular-x: 50%;
   --specular-y: 50%;
-  --specular-opacity: .3;
+  --specular-opacity: .46;
   touch-action: pan-y;
 }
 .specular-surface::after {
@@ -133,8 +133,8 @@ html.has-scroll-reveal .passenger-site [data-reveal].is-visible { opacity: 1; tr
   border-radius: inherit;
   opacity: var(--specular-opacity);
   background:
-    radial-gradient(ellipse 42% 34% at var(--specular-x) var(--specular-y), rgb(255 255 255 / 72%), rgb(255 255 255 / 20%) 44%, transparent 78%),
-    linear-gradient(132deg, transparent 39%, rgb(255 255 255 / 21%) 49%, transparent 60%);
+    radial-gradient(ellipse 46% 38% at var(--specular-x) var(--specular-y), rgb(170 224 255 / 92%), rgb(61 166 237 / 38%) 44%, transparent 78%),
+    linear-gradient(132deg, transparent 39%, rgb(86 183 255 / 42%) 49%, transparent 60%);
   mix-blend-mode: screen;
   transition: opacity .22s ease;
 }
@@ -254,8 +254,8 @@ html.has-scroll-reveal .passenger-site [data-reveal].is-visible { opacity: 1; tr
 .download-card > * { position: relative; z-index: 2; }
 .download-card.specular-surface::after {
   background:
-    radial-gradient(ellipse 42% 34% at var(--specular-x) var(--specular-y), rgb(255 255 255 / 48%), rgb(233 139 0 / 26%) 44%, transparent 78%),
-    linear-gradient(132deg, transparent 39%, rgb(233 139 0 / 12%) 49%, transparent 60%);
+    radial-gradient(ellipse 46% 38% at var(--specular-x) var(--specular-y), rgb(255 255 255 / 72%), rgb(67 157 226 / 34%) 44%, transparent 78%),
+    linear-gradient(132deg, transparent 39%, rgb(42 133 205 / 18%) 49%, transparent 60%);
   mix-blend-mode: multiply;
 }
 .download-card-heading { display: flex; align-items: center; gap: 11px; }
