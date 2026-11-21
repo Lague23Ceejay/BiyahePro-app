@@ -149,7 +149,7 @@ html.has-scroll-reveal .passenger-site [data-reveal].is-visible { opacity: 1; tr
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   pointer-events: none;
 }
 .floating-note { display: inline-flex; position: absolute; z-index: 3; align-items: center; gap: 10px; padding: 12px 15px; border: 1px solid rgb(235 225 211 / 80%); border-radius: 15px; background: #fffdf9; box-shadow: 0 14px 30px rgb(67 54 38 / 14%); }
@@ -262,9 +262,10 @@ html.has-scroll-reveal .passenger-site [data-reveal].is-visible { opacity: 1; tr
 .download-device { width: 39px; height: 39px; display: grid; place-items: center; border-radius: 12px; color: var(--green); background: #e1f3e7; }
 .download-card-heading > span:last-child { display: grid; }
 .download-card-heading strong { font-family: Manrope, sans-serif; font-size: 14px; }
-.qr-frame,.qr-placeholder { width: 100%; height: 210px; margin-top: 17px; border: 1px solid #eee5d8; border-radius: 15px; display: grid; place-items: center; overflow: hidden; background: #f8f4ec; }
-.qr-frame img { width: 100%; height: 100%; padding: 12px; object-fit: contain; }
-.qr-placeholder { align-content: center; gap: 5px; color: #766b5d; }
+.qr-frame,.qr-placeholder { width: 100%; margin-top: 17px; border: 1px solid #eee5d8; border-radius: 15px; display: grid; place-items: center; overflow: hidden; background: #f8f4ec; }
+.qr-frame { min-height: 210px; }
+.qr-frame img { display: block; width: 100%; height: auto; max-height: min(65vh, 480px); padding: 12px; object-fit: contain; }
+.qr-placeholder { height: 210px; align-content: center; gap: 5px; color: #766b5d; }
 .qr-placeholder svg { color: #897a64; }
 .qr-placeholder span { color: #40382f; font-size: 11px; font-weight: 800; }
 .qr-placeholder small { font-size: 10px; }

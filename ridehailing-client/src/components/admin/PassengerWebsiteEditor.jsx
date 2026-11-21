@@ -305,7 +305,7 @@ function WebsiteImageUpload({ label, assetKey, value, alt, onChange, onAuthError
     <div className="flex flex-wrap items-end gap-4">
       <div className="grid h-20 w-28 place-items-center overflow-hidden rounded-lg border border-slate-700 bg-slate-950">
         {preview
-          ? <img src={preview} alt={`${label} preview`} className="h-full w-full object-cover" onError={() => setExists(false)} />
+          ? <img src={preview} alt={`${label} preview`} className="h-full w-full object-contain" onError={() => setExists(false)} />
           : <Image className="h-5 w-5 text-slate-600" />}
       </div>
       <div className="min-w-52 flex-1">
