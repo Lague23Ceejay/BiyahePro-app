@@ -362,7 +362,7 @@ This phase builds your relational database, adds location trackers, creates an i
 2. Paste and run these configuration scripts **one line at a time** inside the `postgres=#` interface:
    ```sql
    CREATE DATABASE ridehailing OWNER postgres;
-   CREATE ROLE ridehailing_app WITH LOGIN PASSWORD 'Pisosabohol01';
+   CREATE ROLE ridehailing_app WITH LOGIN PASSWORD 'change-this-app-password';
    \c ridehailing
    ```
 3. Load and compile all structure scripts in their correct file order to prevent cross-relationship breaks:
